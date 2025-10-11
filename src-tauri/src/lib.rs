@@ -41,7 +41,7 @@ async fn update_note(
     let vault = state.vault.lock().map_err(|e| e.to_string())?;
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
-    let note = vault.update_note(&id, &content).map_err(|e| e.to_string())?;
+    let _note = vault.update_note(&id, &content).map_err(|e| e.to_string())?;
     let updated = db.update_note(&id, &content).map_err(|e| e.to_string())?;
 
     Ok(updated)

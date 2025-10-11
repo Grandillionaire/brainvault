@@ -1,14 +1,10 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use notify::{Event, EventKind, RecursiveMode, Watcher};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::channel;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use uuid::Uuid;
 use walkdir::WalkDir;
 
@@ -359,9 +355,9 @@ fn strip_markdown(content: &str) -> String {
                 .replace("_", "")
                 .replace("~~", "")
                 .replace("`", "")
-                .trim()
+                .to_string()
         })
-        .filter(|line| !line.is_empty())
+        .filter(|line| !line.trim().is_empty())
         .collect::<Vec<_>>()
         .join(" ")
 }
