@@ -5,6 +5,7 @@ import { CommandPalette } from "./components/CommandPalette/CommandPalette";
 import { GraphView } from "./components/Graph/GraphView";
 import { AIChat } from "./components/AI/AIChat";
 import { OnboardingTutorial } from "./components/Onboarding/OnboardingTutorial";
+import { SettingsModal } from "./components/Settings/SettingsModal";
 import { useNotesStore } from "./stores/notesStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useUIStore } from "./stores/uiStore";
@@ -277,6 +278,9 @@ function App() {
 
       {/* AI Chat */}
       <AIChat />
+
+      {/* Settings Modal */}
+      <SettingsModal />
     </div>
   );
 }
