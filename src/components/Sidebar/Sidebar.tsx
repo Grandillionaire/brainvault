@@ -174,9 +174,12 @@ export const Sidebar: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-semibold">BrainVault</h1>
           <button
-            onClick={() => createNote()}
+            onClick={async () => {
+              const note = await createNote();
+              setCurrentNote(note);
+            }}
             className="p-1 hover:bg-accent rounded-sm"
-            title="New Note"
+            title="New Note (Cmd+N)"
           >
             <Plus className="w-4 h-4" />
           </button>

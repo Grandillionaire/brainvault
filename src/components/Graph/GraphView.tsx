@@ -103,23 +103,27 @@ export const GraphView: React.FC = () => {
 
   // Zoom controls
   const handleZoomIn = () => {
-    if (graphRef.current) {
-      const camera = graphRef.current.camera();
-      camera.zoom *= 1.2;
-      graphRef.current.cameraPosition({ z: camera.position.z / 1.2 }, 500);
+    if (graphRef.current && graphRef.current.cameraPosition) {
+      const currentPos = graphRef.current.cameraPosition();
+      if (currentPos && currentPos.z) {
+        graphRef.current.cameraPosition({ z: currentPos.z / 1.2 }, 500);
+      }
     }
   };
 
   const handleZoomOut = () => {
-    if (graphRef.current) {
-      const camera = graphRef.current.camera();
-      camera.zoom *= 0.8;
-      graphRef.current.cameraPosition({ z: camera.position.z * 1.2 }, 500);
+    if (graphRef.current && graphRef.current.cameraPosition) {
+      const currentPos = graphRef.current.cameraPosition();
+      if (currentPos && currentPos.z) {
+        graphRef.current.cameraPosition({ z: currentPos.z * 1.2 }, 500);
+      }
     }
   };
 
   const handleFitView = () => {
-    graphRef.current?.zoomToFit(400, 50);
+    if (graphRef.current && graphRef.current.zoomToFit) {
+      graphRef.current.zoomToFit(400, 50);
+    }
   };
 
   if (!graphViewOpen) return null;
