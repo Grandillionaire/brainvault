@@ -3,6 +3,7 @@ import { devtools, persist } from "zustand/middleware";
 import { Note, SearchResult, SearchOptions } from "../types";
 import { notesApi, searchApi } from "../lib/api";
 import { extractWikiLinks, extractTags } from "../lib/utils";
+import { toast } from "sonner";
 
 interface NotesState {
   notes: Note[];
@@ -84,6 +85,7 @@ export const useNotesStore = create<NotesState>()(
               isLoading: false,
             }));
 
+            toast.success("note created");
             return note;
           } catch (error) {
             set({ error: String(error), isLoading: false });
@@ -117,6 +119,7 @@ export const useNotesStore = create<NotesState>()(
             });
           } catch (error) {
             set({ error: String(error), isLoading: false });
+            toast.error("failed to save note");
           }
         },
 
@@ -130,8 +133,11 @@ export const useNotesStore = create<NotesState>()(
               currentNote: state.currentNote?.id === id ? null : state.currentNote,
               isLoading: false,
             }));
+
+            toast.success("note deleted");
           } catch (error) {
             set({ error: String(error), isLoading: false });
+            toast.error("failed to delete note");
           }
         },
 

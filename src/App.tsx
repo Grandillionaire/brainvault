@@ -6,6 +6,7 @@ import { GraphView } from "./components/Graph/GraphView";
 import { AIChat } from "./components/AI/AIChat";
 import { OnboardingTutorial } from "./components/Onboarding/OnboardingTutorial";
 import { SettingsModal } from "./components/Settings/SettingsModal";
+import { ShortcutsModal } from "./components/Help/ShortcutsModal";
 import { useNotesStore } from "./stores/notesStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useUIStore } from "./stores/uiStore";
@@ -13,6 +14,9 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { cn } from "./lib/utils";
 import { ViewMode } from "./types";
 import ReactMarkdown from "react-markdown";
+import { Toaster, toast } from "sonner";
+import { Download, FileDown } from "lucide-react";
+import { exportNoteAsMarkdown, exportNoteAsPDF } from "./lib/export";
 import "./styles/globals.css";
 
 function App() {
@@ -112,6 +116,11 @@ function App() {
     }
   });
 
+  useHotkeys("shift+/", (e) => {
+    e.preventDefault();
+    useUIStore.getState().openShortcuts();
+  });
+
   // Handle split view dragging
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging) return;
@@ -162,6 +171,7 @@ function App() {
 
   return (
     <div className={cn("flex h-screen bg-background", focusMode && "focus-mode")}>
+      <Toaster position="bottom-right" richColors closeButton />
       <CommandPalette />
       <GraphView />
       <AIChat />
@@ -207,8 +217,33 @@ function App() {
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <button
+                onClick={() => {
+                  exportNoteAsMarkdown(currentNote);
+                  toast.success("exported as markdown");
+                }}
+                className="p-1 hover:bg-muted rounded transition-colors"
+                title="export as markdown"
+              >
+                <FileDown className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  try {
+                    exportNoteAsPDF(currentNote);
+                    toast.success("opening print dialog");
+                  } catch {
+                    toast.error("failed to open print dialog");
+                  }
+                }}
+                className="p-1 hover:bg-muted rounded transition-colors"
+                title="export as pdf"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+              <button
                 onClick={() => useUIStore.getState().togglePinNote(currentNote)}
-                className="hover:text-foreground"
+                className="p-1 hover:bg-muted rounded transition-colors"
+                title="pin note"
               >
                 📌
               </button>
@@ -300,6 +335,9 @@ function App() {
 
       {/* Settings Modal */}
       <SettingsModal />
+
+      {/* Shortcuts Modal */}
+      <ShortcutsModal />
     </div>
   );
 }

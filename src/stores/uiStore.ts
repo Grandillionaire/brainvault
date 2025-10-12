@@ -8,6 +8,7 @@ interface UIState {
   sidebarOpen: boolean;
   commandPaletteOpen: boolean;
   settingsOpen: boolean;
+  shortcutsOpen: boolean;
   aiChatOpen: boolean;
   graphViewOpen: boolean;
   canvasViewOpen: boolean;
@@ -34,6 +35,8 @@ interface UIState {
   closeCommandPalette: () => void;
   openSettings: () => void;
   closeSettings: () => void;
+  openShortcuts: () => void;
+  closeShortcuts: () => void;
   openAIChat: () => void;
   closeAIChat: () => void;
   openGraphView: () => void;
@@ -61,6 +64,7 @@ export const useUIStore = create<UIState>()(
         sidebarOpen: true,
         commandPaletteOpen: false,
         settingsOpen: false,
+        shortcutsOpen: false,
         aiChatOpen: false,
         graphViewOpen: false,
         canvasViewOpen: false,
@@ -103,6 +107,14 @@ export const useUIStore = create<UIState>()(
 
         closeSettings: () => {
           set({ settingsOpen: false });
+        },
+
+        openShortcuts: () => {
+          set({ shortcutsOpen: true });
+        },
+
+        closeShortcuts: () => {
+          set({ shortcutsOpen: false });
         },
 
         openAIChat: () => {

@@ -1,22 +1,40 @@
 import React, { useState } from "react";
-import { X, Check, Moon, Sun, Monitor, Save } from "lucide-react";
+import { X, Check, Moon, Sun, Monitor, Save, Archive } from "lucide-react";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
+import { useNotesStore } from "../../stores/notesStore";
+import { exportAllNotesAsZip } from "../../lib/export";
+import { toast } from "sonner";
 import { cn } from "../../lib/utils";
 
 export const SettingsModal: React.FC = () => {
   const { settings, updateSettings } = useSettingsStore();
   const { settingsOpen, closeSettings } = useUIStore();
+  const { notes } = useNotesStore();
   const [activeTab, setActiveTab] = useState<"general" | "appearance" | "editor" | "ai">("general");
   const [localSettings, setLocalSettings] = useState(settings);
   const [saved, setSaved] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   if (!settingsOpen) return null;
 
   const handleSave = async () => {
     await updateSettings(localSettings);
     setSaved(true);
+    toast.success("settings saved");
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleExportAll = async () => {
+    setExporting(true);
+    try {
+      await exportAllNotesAsZip(notes);
+      toast.success("exported all notes");
+    } catch (error) {
+      toast.error("failed to export notes");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const updateLocal = async (category: keyof typeof localSettings, key: string, value: any) => {
@@ -164,6 +182,21 @@ export const SettingsModal: React.FC = () => {
                         <option value="preview">Preview Only</option>
                         <option value="split">Split View</option>
                       </select>
+                    </div>
+
+                    <div className="pt-4 border-t">
+                      <h4 className="text-sm font-semibold mb-3">data export</h4>
+                      <button
+                        onClick={handleExportAll}
+                        disabled={exporting || notes.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Archive className="w-4 h-4" />
+                        {exporting ? "exporting..." : `export all notes (${notes.length})`}
+                      </button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        download all notes as a zip file
+                      </p>
                     </div>
                   </div>
                 </div>
