@@ -36,6 +36,23 @@ function App() {
       try {
         await loadSettings();
         await loadNotes();
+
+        // After loading notes, open the most recent one or create a new one
+        const notes = useNotesStore.getState().notes;
+        if (notes.length > 0) {
+          // Open most recent note (sorted by updatedAt)
+          const mostRecent = [...notes].sort((a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          )[0];
+          useNotesStore.getState().setCurrentNote(mostRecent);
+        } else {
+          // No notes exist, create a welcome note
+          const welcomeNote = await createNote(
+            "Welcome to BrainVault",
+            "# Welcome to BrainVault\n\nStart taking notes! You can:\n\n- Create new notes with the + button\n- Use [[wiki links]] to connect notes\n- Add #tags to organize\n- Right-click notes for more options\n- Press Cmd+K to search\n\nHappy note-taking! 🎉"
+          );
+          useNotesStore.getState().setCurrentNote(welcomeNote);
+        }
       } catch (error) {
         console.error("Failed to initialize app:", error);
       } finally {
