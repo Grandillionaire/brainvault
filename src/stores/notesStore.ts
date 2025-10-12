@@ -49,12 +49,34 @@ export const useNotesStore = create<NotesState>()(
           set({ isLoading: true, error: null });
           try {
             const tags = extractTags(content);
+            const links = extractWikiLinks(content);
 
-            const note = await notesApi.create({
-              title,
-              content,
-              tags,
-            });
+            // Try API first, fallback to local storage
+            let note: Note;
+            try {
+              note = await notesApi.create({
+                title,
+                content,
+                tags,
+              });
+            } catch (apiError) {
+              // Fallback: create note locally
+              console.log('API unavailable, creating note locally');
+              note = {
+                id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                title,
+                content,
+                tags,
+                links,
+                backlinks: [],
+                attachments: [],
+                path: `${title}.md`,
+                plainContent: content.replace(/[#\[\]]/g, ""),
+                metadata: {},
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              };
+            }
 
             set((state) => ({
               notes: [...state.notes, note],

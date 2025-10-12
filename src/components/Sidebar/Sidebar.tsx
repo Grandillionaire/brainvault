@@ -6,12 +6,15 @@ import {
   Clock,
   Pin,
   Folder,
+  FolderPlus,
   ChevronRight,
   ChevronDown,
   FileText,
   Settings,
   GitBranch,
   MessageSquare,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -26,7 +29,7 @@ interface TreeNode {
 }
 
 export const Sidebar: React.FC = () => {
-  const { notes, currentNote, setCurrentNote, createNote } = useNotesStore();
+  const { notes, currentNote, setCurrentNote, createNote, deleteNote, updateNote } = useNotesStore();
   const {
     sidebarOpen,
     searchQuery,
@@ -38,10 +41,13 @@ export const Sidebar: React.FC = () => {
     openSettings,
     openGraphView,
     openAIChat,
+    togglePinNote,
   } = useUIStore();
 
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [activeSection, setActiveSection] = useState<"files" | "tags" | "recent" | "pinned">("files");
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; note: any } | null>(null);
+  const [newFolderModal, setNewFolderModal] = useState(false);
 
   // Get all unique tags
   const allTags = useMemo(() => {
@@ -119,6 +125,35 @@ export const Sidebar: React.FC = () => {
     });
   };
 
+  // Close context menu on click outside
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
+
+  const handleDeleteNote = async (noteId: string) => {
+    if (confirm('Are you sure you want to delete this note?')) {
+      await deleteNote(noteId);
+      setContextMenu(null);
+    }
+  };
+
+  const handleRenameNote = (note: any) => {
+    const newTitle = prompt('Enter new title:', note.title);
+    if (newTitle && newTitle !== note.title) {
+      updateNote(note.id, { title: newTitle });
+    }
+    setContextMenu(null);
+  };
+
+  const handleDuplicateNote = async (note: any) => {
+    await createNote(`${note.title} (copy)`, note.content);
+    setContextMenu(null);
+  };
+
   const renderTree = (nodes: TreeNode[], level = 0) => {
     return nodes.map(node => {
       const isExpanded = expandedFolders.has(node.id);
@@ -157,6 +192,10 @@ export const Sidebar: React.FC = () => {
           )}
           style={{ paddingLeft: `${level * 12 + 20}px` }}
           onClick={() => setCurrentNote(node.note)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextMenu({ x: e.clientX, y: e.clientY, note: node.note });
+          }}
         >
           <FileText className="w-3 h-3" />
           <span className="flex-1 truncate">{node.name}</span>
@@ -173,16 +212,25 @@ export const Sidebar: React.FC = () => {
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-semibold">BrainVault</h1>
-          <button
-            onClick={async () => {
-              const note = await createNote();
-              setCurrentNote(note);
-            }}
-            className="p-1 hover:bg-accent rounded-sm"
-            title="New Note (Cmd+N)"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setNewFolderModal(true)}
+              className="p-1 hover:bg-accent rounded-sm"
+              title="New Folder"
+            >
+              <FolderPlus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={async () => {
+                const note = await createNote();
+                setCurrentNote(note);
+              }}
+              className="p-1 hover:bg-accent rounded-sm"
+              title="New Note (Cmd+N)"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -343,6 +391,109 @@ export const Sidebar: React.FC = () => {
           <Settings className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-popover border rounded-lg shadow-xl py-2 z-[100] min-w-[200px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="flex items-center gap-3 w-full px-4 py-2 text-sm hover:bg-accent transition-colors text-left"
+            onClick={() => {
+              setCurrentNote(contextMenu.note);
+              setContextMenu(null);
+            }}
+          >
+            <FileText className="w-4 h-4" />
+            Open
+          </button>
+          <button
+            className="flex items-center gap-3 w-full px-4 py-2 text-sm hover:bg-accent transition-colors text-left"
+            onClick={() => handleRenameNote(contextMenu.note)}
+          >
+            <Edit2 className="w-4 h-4" />
+            Rename
+          </button>
+          <button
+            className="flex items-center gap-3 w-full px-4 py-2 text-sm hover:bg-accent transition-colors text-left"
+            onClick={() => handleDuplicateNote(contextMenu.note)}
+          >
+            <Plus className="w-4 h-4" />
+            Duplicate
+          </button>
+          <button
+            className="flex items-center gap-3 w-full px-4 py-2 text-sm hover:bg-accent transition-colors text-left"
+            onClick={() => {
+              togglePinNote(contextMenu.note);
+              setContextMenu(null);
+            }}
+          >
+            <Pin className="w-4 h-4" />
+            {pinnedNotes.some(n => n.id === contextMenu.note.id) ? 'Unpin' : 'Pin'}
+          </button>
+          <div className="h-px bg-border my-1" />
+          <button
+            className="flex items-center gap-3 w-full px-4 py-2 text-sm hover:bg-accent transition-colors text-destructive text-left"
+            onClick={() => handleDeleteNote(contextMenu.note.id)}
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        </div>
+      )}
+
+      {/* New Folder Modal */}
+      {newFolderModal && (
+        <div className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center">
+          <div className="bg-background border rounded-lg shadow-xl p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Create New Folder</h3>
+            <input
+              type="text"
+              placeholder="Folder name (e.g., Projects/Work)"
+              className="w-full px-3 py-2 bg-muted rounded-md mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const folderName = (e.target as HTMLInputElement).value.trim();
+                  if (folderName) {
+                    // Create a placeholder note in the folder
+                    createNote(`${folderName}/README`, `# ${folderName}\n\nThis is a folder for organizing notes.`);
+                  }
+                  setNewFolderModal(false);
+                } else if (e.key === 'Escape') {
+                  setNewFolderModal(false);
+                }
+              }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setNewFolderModal(false)}
+                className="px-4 py-2 text-sm hover:bg-accent rounded-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const input = document.querySelector<HTMLInputElement>('input[placeholder*="Folder"]');
+                  const folderName = input?.value.trim();
+                  if (folderName) {
+                    createNote(`${folderName}/README`, `# ${folderName}\n\nThis is a folder for organizing notes.`);
+                  }
+                  setNewFolderModal(false);
+                }}
+                className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+              >
+                Create
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              💡 Tip: Use "/" to create nested folders (e.g., "Projects/Work/2024")
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

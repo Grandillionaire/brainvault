@@ -19,14 +19,28 @@ export const SettingsModal: React.FC = () => {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const updateLocal = (category: keyof typeof localSettings, key: string, value: any) => {
-    setLocalSettings(prev => ({
-      ...prev,
+  const updateLocal = async (category: keyof typeof localSettings, key: string, value: any) => {
+    const newSettings = {
+      ...localSettings,
       [category]: {
-        ...prev[category],
+        ...localSettings[category],
         [key]: value
       }
-    }));
+    };
+    setLocalSettings(newSettings);
+
+    // Apply theme change immediately for instant feedback
+    if (category === 'appearance' && key === 'theme') {
+      const root = document.documentElement;
+      if (value === "auto") {
+        const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        root.classList.toggle("dark", isDark);
+      } else {
+        root.classList.toggle("dark", value === "dark");
+      }
+      // Save immediately
+      await updateSettings(newSettings);
+    }
   };
 
   return (
