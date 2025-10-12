@@ -1,5 +1,9 @@
 # BrainVault
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/v/release/Grandillionaire/brainvault)](https://github.com/Grandillionaire/brainvault/releases)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 a local-first note-taking app that keeps your data on your machine. no cloud, no tracking, just your notes.
 
 ## why i built this
@@ -89,7 +93,7 @@ mit - use it however you want
 
 ## contributing
 
-prs welcome. keep it simple and fast.
+prs welcome. see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
