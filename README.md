@@ -21,7 +21,7 @@ i got tired of note apps that require internet, send my data to servers, and cha
 ## install
 
 ```bash
-git clone https://github.com/yourusername/brainvault
+git clone https://github.com/Grandillionaire/brainvault
 cd brainvault
 npm install
 npm run dev
