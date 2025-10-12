@@ -13,6 +13,7 @@ import { useNotesStore } from "../../stores/notesStore";
 import { useUIStore } from "../../stores/uiStore";
 import { debounce } from "../../lib/utils";
 import { cn } from "../../lib/utils";
+import { EditorContextMenu } from "./EditorContextMenu";
 
 interface MarkdownEditorProps {
   noteId?: string;
@@ -31,10 +32,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   placeholder = "Start writing...",
   readOnly = false,
 }) => {
-  const { updateNote, currentNote } = useNotesStore();
-  const { focusMode } = useUIStore();
+  const { updateNote, currentNote, notes, setCurrentNote } = useNotesStore();
+  const { focusMode, setSearchQuery, openCommandPalette } = useUIStore();
   const [wordCount, setWordCount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; selectedText: string } | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -212,6 +214,113 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [editor]);
 
+  // Context menu handlers
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!editor) return;
+
+    const selectedText = editor.state.doc.textBetween(
+      editor.state.selection.from,
+      editor.state.selection.to,
+      ' '
+    );
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      selectedText
+    });
+  }, [editor]);
+
+  const handleDoubleClick = useCallback(() => {
+    if (!editor) return;
+
+    const selectedText = editor.state.doc.textBetween(
+      editor.state.selection.from,
+      editor.state.selection.to,
+      ' '
+    );
+
+    // Check if double-clicked on a wiki link
+    const wikiLinkMatch = selectedText.match(/\[\[(.+?)\]\]/);
+    if (wikiLinkMatch) {
+      const linkedTitle = wikiLinkMatch[1];
+      const linkedNote = notes.find(n => n.title === linkedTitle);
+      if (linkedNote) {
+        setCurrentNote(linkedNote);
+      }
+      return;
+    }
+
+    // Check if double-clicked on a tag
+    if (selectedText.startsWith('#')) {
+      const tag = selectedText.replace('#', '');
+      setSearchQuery(`#${tag}`);
+      openCommandPalette();
+    }
+  }, [editor, notes, setCurrentNote, setSearchQuery, openCommandPalette]);
+
+  const handleEditorAction = useCallback((action: string) => {
+    if (!editor) return;
+
+    switch (action) {
+      case 'bold':
+        editor.chain().focus().toggleBold().run();
+        break;
+      case 'italic':
+        editor.chain().focus().toggleItalic().run();
+        break;
+      case 'code':
+        editor.chain().focus().toggleCode().run();
+        break;
+      case 'link':
+        const url = prompt('Enter URL:');
+        if (url) {
+          editor.chain().focus().setLink({ href: url }).run();
+        }
+        break;
+      case 'wikilink':
+        const selection = editor.state.doc.textBetween(
+          editor.state.selection.from,
+          editor.state.selection.to
+        );
+        editor.chain().focus().insertContent(`[[${selection}]]`).run();
+        break;
+      case 'tag':
+        const tag = editor.state.doc.textBetween(
+          editor.state.selection.from,
+          editor.state.selection.to
+        );
+        editor.chain().focus().insertContent(`#${tag}`).run();
+        break;
+      case 'cut':
+        document.execCommand('cut');
+        break;
+      case 'paste':
+        document.execCommand('paste');
+        break;
+      case 'delete':
+        editor.chain().focus().deleteSelection().run();
+        break;
+      case 'search':
+        const searchText = editor.state.doc.textBetween(
+          editor.state.selection.from,
+          editor.state.selection.to
+        );
+        setSearchQuery(searchText);
+        openCommandPalette();
+        break;
+    }
+  }, [editor, setSearchQuery, openCommandPalette]);
+
   if (!editor) {
     return null;
   }
@@ -225,11 +334,23 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           editor.commands.focus();
         }
       }}
+      onContextMenu={handleContextMenu}
+      onDoubleClick={handleDoubleClick}
     >
       <EditorContent
         editor={editor}
         className="flex-1 overflow-y-auto scrollbar-thin cursor-text"
       />
+
+      {contextMenu && (
+        <EditorContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          selectedText={contextMenu.selectedText}
+          onClose={() => setContextMenu(null)}
+          onAction={handleEditorAction}
+        />
+      )}
       <div className="flex items-center justify-between px-4 py-2 border-t text-xs text-muted-foreground">
         <div className="flex items-center gap-4">
           <span>{wordCount} words</span>

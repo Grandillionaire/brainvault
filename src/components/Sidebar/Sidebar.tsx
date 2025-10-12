@@ -307,6 +307,17 @@ export const Sidebar: React.FC = () => {
                     selectedTags.includes(tag) && "bg-accent text-accent-foreground"
                   )}
                   onClick={() => toggleTag(tag)}
+                  onDoubleClick={() => {
+                    setSearchQuery(`#${tag}`);
+                    setActiveSection("files");
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    const tagNotes = notes.filter(n => n.tags.includes(tag));
+                    if (tagNotes.length > 0) {
+                      setContextMenu({ x: e.clientX, y: e.clientY, note: tagNotes[0] });
+                    }
+                  }}
                 >
                   <Hash className="w-3 h-3" />
                   <span className="flex-1">{tag}</span>
@@ -332,6 +343,11 @@ export const Sidebar: React.FC = () => {
                     currentNote?.id === note.id && "bg-accent text-accent-foreground"
                   )}
                   onClick={() => setCurrentNote(note)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, note });
+                  }}
+                  onDoubleClick={() => setCurrentNote(note)}
                 >
                   <Clock className="w-3 h-3" />
                   <span className="flex-1 truncate">{note.title}</span>
@@ -357,6 +373,11 @@ export const Sidebar: React.FC = () => {
                     currentNote?.id === note.id && "bg-accent text-accent-foreground"
                   )}
                   onClick={() => setCurrentNote(note)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, note });
+                  }}
+                  onDoubleClick={() => setCurrentNote(note)}
                 >
                   <Pin className="w-3 h-3" />
                   <span className="flex-1 truncate">{note.title}</span>
