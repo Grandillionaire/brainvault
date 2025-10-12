@@ -250,14 +250,9 @@ function App() {
                   }
                 >
                   <MarkdownEditor
-                    key={currentNote.id}
                     noteId={currentNote.id}
                     content={editorContent}
-                    onChange={(content) => {
-                      setEditorContent(content);
-                      // Also update the note immediately in store
-                      updateNote(currentNote.id, { content });
-                    }}
+                    onChange={setEditorContent}
                     className="h-full"
                   />
                 </div>

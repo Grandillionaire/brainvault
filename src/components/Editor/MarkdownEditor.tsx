@@ -115,13 +115,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   );
 
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      const { from, to } = editor.state.selection;
-      editor.commands.setContent(content);
-      // Restore cursor position if editing
-      if (editor.isFocused) {
-        editor.commands.setTextSelection({ from, to });
-      }
+    if (editor && !editor.isFocused && content !== editor.getHTML()) {
+      // Only update content if editor is not focused (prevent disrupting typing)
+      editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [content, editor]);
 
