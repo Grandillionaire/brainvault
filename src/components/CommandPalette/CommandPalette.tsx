@@ -10,7 +10,6 @@ import {
   GitBranch,
   MessageSquare,
   Download,
-  Upload,
   Moon,
   Sun,
   Monitor,
@@ -19,11 +18,12 @@ import {
   Trash2,
   Archive,
   BookOpen,
-  Zap,
 } from "lucide-react";
 import { useUIStore } from "../../stores/uiStore";
 import { useNotesStore } from "../../stores/notesStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { exportNoteAsMarkdown, exportNoteAsPDF } from "../../lib/export";
+import { toast } from "sonner";
 
 interface CommandItem {
   id: string;
@@ -37,7 +37,7 @@ interface CommandItem {
 
 export const CommandPalette: React.FC = () => {
   const { commandPaletteOpen, closeCommandPalette, openSettings, openGraphView, openCanvasView, openAIChat, setViewMode } = useUIStore();
-  const { createNote, notes, setCurrentNote } = useNotesStore();
+  const { createNote, notes, setCurrentNote, currentNote } = useNotesStore();
   const { settings, updateSettings } = useSettingsStore();
   const [search, setSearch] = useState("");
   const [selectedCategory] = useState<string | null>(null); // For future category filtering
@@ -226,24 +226,13 @@ export const CommandPalette: React.FC = () => {
       },
     },
     {
-      id: "ai-summarize",
-      name: "Summarize Note",
-      icon: <Zap className="w-4 h-4" />,
+      id: "ai-chat",
+      name: "AI Chat",
+      icon: <MessageSquare className="w-4 h-4" />,
       category: "AI",
-      description: "Generate a summary of current note",
-      action: async () => {
-        // TODO: Implement AI summarization
-        closeCommandPalette();
-      },
-    },
-    {
-      id: "ai-suggest-links",
-      name: "Suggest Links",
-      icon: <GitBranch className="w-4 h-4" />,
-      category: "AI",
-      description: "Find related notes",
-      action: async () => {
-        // TODO: Implement AI link suggestions
+      description: "Open AI chat panel",
+      action: () => {
+        openAIChat();
         closeCommandPalette();
       },
     },
@@ -295,15 +284,18 @@ export const CommandPalette: React.FC = () => {
       },
     },
 
-    // Export/Import commands
+    // Export commands
     {
       id: "export-markdown",
       name: "Export as Markdown",
       icon: <Download className="w-4 h-4" />,
       category: "Export",
       description: "Export current note as markdown",
-      action: async () => {
-        // TODO: Implement export
+      action: () => {
+        if (currentNote) {
+          exportNoteAsMarkdown(currentNote);
+          toast.success("exported as markdown");
+        }
         closeCommandPalette();
       },
     },
@@ -313,23 +305,19 @@ export const CommandPalette: React.FC = () => {
       icon: <Download className="w-4 h-4" />,
       category: "Export",
       description: "Export current note as PDF",
-      action: async () => {
-        // TODO: Implement PDF export
+      action: () => {
+        if (currentNote) {
+          try {
+            exportNoteAsPDF(currentNote);
+            toast.success("opening print dialog");
+          } catch {
+            toast.error("failed to open print dialog");
+          }
+        }
         closeCommandPalette();
       },
     },
-    {
-      id: "import-notes",
-      name: "Import Notes",
-      icon: <Upload className="w-4 h-4" />,
-      category: "Import",
-      description: "Import notes from other apps",
-      action: async () => {
-        // TODO: Implement import
-        closeCommandPalette();
-      },
-    },
-  ], [notes, settings, createNote, setCurrentNote]);
+  ], [notes, settings, createNote, setCurrentNote, currentNote, openAIChat, updateSettings, closeCommandPalette, openSettings, openGraphView, setViewMode]);
 
   const filteredCommands = useMemo(() => {
     let filtered = commands;
