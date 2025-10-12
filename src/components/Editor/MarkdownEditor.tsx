@@ -71,6 +71,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     ],
     content,
     editable: !readOnly,
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-full',
+      },
+    },
     onUpdate: ({ editor }) => {
       const text = editor.getText();
       const words = text.split(/\s+/).filter(Boolean).length;
@@ -81,6 +86,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       const text = editor.getText();
       const words = text.split(/\s+/).filter(Boolean).length;
       setWordCount(words);
+      // Auto-focus editor on create
+      setTimeout(() => {
+        editor.commands.focus();
+      }, 100);
     },
   });
 
@@ -105,7 +114,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
+      const { from, to } = editor.state.selection;
       editor.commands.setContent(content);
+      // Restore cursor position if editing
+      if (editor.isFocused) {
+        editor.commands.setTextSelection({ from, to });
+      }
     }
   }, [content, editor]);
 
@@ -205,10 +219,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   }
 
   return (
-    <div className={cn("relative h-full flex flex-col", className, focusMode && "focus-mode")}>
+    <div
+      className={cn("relative h-full flex flex-col", className, focusMode && "focus-mode")}
+      onClick={() => {
+        // Focus editor when clicking anywhere in the editor area
+        if (editor && !editor.isFocused) {
+          editor.commands.focus();
+        }
+      }}
+    >
       <EditorContent
         editor={editor}
-        className="flex-1 overflow-y-auto scrollbar-thin"
+        className="flex-1 overflow-y-auto scrollbar-thin cursor-text"
       />
       <div className="flex items-center justify-between px-4 py-2 border-t text-xs text-muted-foreground">
         <div className="flex items-center gap-4">
