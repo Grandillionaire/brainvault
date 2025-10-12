@@ -55,7 +55,6 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       }),
       Placeholder.configure({
         placeholder,
-        emptyNodeClass: "first:before:text-muted-foreground first:before:content-[attr(data-placeholder)] first:before:float-left first:before:pointer-events-none",
       }),
       TaskList.configure({
         HTMLAttributes: {
@@ -69,29 +68,29 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         nested: true,
       }),
     ],
-    content,
+    content: content || "",
     editable: !readOnly,
+    autofocus: true,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-full',
+        class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-full p-8',
+        spellcheck: 'false',
       },
     },
     onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
       const text = editor.getText();
       const words = text.split(/\s+/).filter(Boolean).length;
       setWordCount(words);
-      debouncedSave(editor.getHTML());
+      debouncedSave(html);
     },
     onCreate: ({ editor }) => {
+      console.log('Editor created, editable:', editor.isEditable);
       const text = editor.getText();
       const words = text.split(/\s+/).filter(Boolean).length;
       setWordCount(words);
-      // Auto-focus editor on create
-      setTimeout(() => {
-        editor.commands.focus();
-      }, 100);
     },
-  });
+  }, [readOnly]);
 
   const debouncedSave = useCallback(
     debounce(async (content: string) => {
