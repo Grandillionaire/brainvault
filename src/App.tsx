@@ -48,7 +48,9 @@ function App() {
   // Update editor content when current note changes
   useEffect(() => {
     if (currentNote) {
-      setEditorContent(currentNote.content);
+      // TipTap editor expects HTML or will convert markdown to HTML
+      // Set content directly, the editor will handle it
+      setEditorContent(currentNote.content || "");
       useUIStore.getState().addRecentNote(currentNote);
     } else {
       setEditorContent("");
@@ -231,9 +233,14 @@ function App() {
                   }
                 >
                   <MarkdownEditor
+                    key={currentNote.id}
                     noteId={currentNote.id}
                     content={editorContent}
-                    onChange={setEditorContent}
+                    onChange={(content) => {
+                      setEditorContent(content);
+                      // Also update the note immediately in store
+                      updateNote(currentNote.id, { content });
+                    }}
                     className="h-full"
                   />
                 </div>

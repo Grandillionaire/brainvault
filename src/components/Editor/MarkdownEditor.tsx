@@ -96,9 +96,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const debouncedSave = useCallback(
     debounce(async (content: string) => {
       if (onChange) {
+        // If onChange is provided, use it (parent handles saving)
         onChange(content);
+        return;
       }
       if (noteId || currentNote?.id) {
+        // Otherwise, handle saving here
         setIsSaving(true);
         try {
           await updateNote(noteId || currentNote!.id, { content });
@@ -108,7 +111,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           setIsSaving(false);
         }
       }
-    }, 1000),
+    }, 500),
     [noteId, currentNote, updateNote, onChange]
   );
 
