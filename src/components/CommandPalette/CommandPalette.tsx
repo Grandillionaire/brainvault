@@ -110,9 +110,14 @@ export const CommandPalette: React.FC = () => {
       icon: <FileStack className="w-4 h-4" />,
       category: "File",
       description: "Create a note from a template",
-      action: () => {
-        useUIStore.getState().openTemplateModal?.();
+      action: async () => {
+        // Quick create using Meeting template as default
+        const template = defaultTemplates.find(t => t.id === "meeting")!;
+        const { title, content } = applyTemplate(template);
+        const note = await createNote(title, content);
+        setCurrentNote(note);
         closeCommandPalette();
+        toast.success("Created from template");
       },
     },
     {
@@ -162,10 +167,10 @@ export const CommandPalette: React.FC = () => {
       name: "Import Notes",
       icon: <Upload className="w-4 h-4" />,
       category: "File",
-      description: "Import from Markdown or Obsidian",
+      description: "Import from Markdown, Obsidian, or Notion",
       action: () => {
-        useUIStore.getState().openImportModal?.();
         closeCommandPalette();
+        toast.info("Use the Import button in the sidebar to import notes");
       },
     },
     {

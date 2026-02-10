@@ -6,7 +6,7 @@
 import React, { useState } from "react";
 import { X, Upload, FolderOpen, FileText, AlertCircle, Check, Loader2 } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
-import { importMarkdownFiles, importFromDirectory, importObsidianVault, ImportResult } from "../../lib/import";
+import { importMarkdownFiles, importFromDirectory, importObsidianVault, importFromNotion, ImportResult } from "../../lib/import";
 import { toast } from "sonner";
 import { cn } from "../../lib/utils";
 
@@ -15,7 +15,7 @@ interface ImportModalProps {
   onClose: () => void;
 }
 
-type ImportMode = "files" | "folder" | "obsidian";
+type ImportMode = "files" | "folder" | "obsidian" | "notion";
 
 export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => {
   const { createNote } = useNotesStore();
@@ -77,21 +77,27 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => 
   const importModes = [
     {
       id: "files" as ImportMode,
-      name: "Markdown Files",
-      description: "Import individual .md files",
+      name: "Markdown",
+      description: "Import .md files",
       icon: FileText,
     },
     {
       id: "folder" as ImportMode,
       name: "Folder",
-      description: "Import all notes from a folder",
+      description: "Import from folder",
       icon: FolderOpen,
     },
     {
       id: "obsidian" as ImportMode,
-      name: "Obsidian Vault",
-      description: "Import from Obsidian with links",
+      name: "Obsidian",
+      description: "Import vault",
       icon: Upload,
+    },
+    {
+      id: "notion" as ImportMode,
+      name: "Notion",
+      description: "Import from Notion",
+      icon: FileText,
     },
   ];
 
@@ -116,7 +122,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => 
 
         {/* Import Mode Selection */}
         <div className="p-6 border-b">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             {importModes.map((importMode) => (
               <button
                 key={importMode.id}
@@ -261,6 +267,28 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => 
                   >
                     Select Obsidian Vault
                   </button>
+                </div>
+              )}
+
+              {mode === "notion" && (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center text-4xl">
+                    📝
+                  </div>
+                  <p className="text-lg font-medium mb-2">Import from Notion</p>
+                  <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+                    Export your Notion workspace as Markdown & CSV, then import the ZIP file here.
+                    Supports databases, pages, and nested content.
+                  </p>
+                  <button
+                    onClick={() => handleImport(importFromNotion)}
+                    className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                  >
+                    Select Notion Export ZIP
+                  </button>
+                  <p className="text-xs text-muted-foreground mt-4">
+                    In Notion: Settings → Export → Markdown & CSV
+                  </p>
                 </div>
               )}
             </>

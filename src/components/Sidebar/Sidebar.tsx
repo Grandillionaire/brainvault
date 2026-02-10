@@ -47,6 +47,7 @@ export const Sidebar: React.FC = () => {
     openSettings,
     openGraphView,
     openAIChat,
+    openCalendar,
     togglePinNote,
   } = useUIStore();
 
@@ -431,6 +432,13 @@ export const Sidebar: React.FC = () => {
           title="Import Notes"
         >
           <Upload className="w-4 h-4" />
+        </button>
+        <button
+          onClick={openCalendar}
+          className="flex-1 flex items-center justify-center gap-1 p-2 text-xs hover:bg-accent hover:text-accent-foreground rounded-sm"
+          title="Calendar View"
+        >
+          <Calendar className="w-4 h-4" />
         </button>
         <button
           onClick={openGraphView}

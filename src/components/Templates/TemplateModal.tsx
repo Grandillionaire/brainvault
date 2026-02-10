@@ -25,7 +25,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({ isOpen, onClose })
   const handleCreate = async () => {
     if (!selectedTemplate) return;
 
-    const { title, content, tags } = applyTemplate(
+    const { title, content } = applyTemplate(
       selectedTemplate,
       customTitle || undefined
     );

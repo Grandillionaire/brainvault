@@ -12,6 +12,7 @@ interface UIState {
   aiChatOpen: boolean;
   graphViewOpen: boolean;
   canvasViewOpen: boolean;
+  calendarOpen: boolean;
   focusMode: boolean;
 
   // Search state
@@ -43,6 +44,8 @@ interface UIState {
   closeGraphView: () => void;
   openCanvasView: () => void;
   closeCanvasView: () => void;
+  openCalendar: () => void;
+  closeCalendar: () => void;
   toggleFocusMode: () => void;
   setSearchQuery: (query: string) => void;
   toggleTag: (tag: string) => void;
@@ -68,6 +71,7 @@ export const useUIStore = create<UIState>()(
         aiChatOpen: false,
         graphViewOpen: false,
         canvasViewOpen: false,
+        calendarOpen: false,
         focusMode: false,
 
         // Search state
@@ -139,6 +143,14 @@ export const useUIStore = create<UIState>()(
 
         closeCanvasView: () => {
           set({ canvasViewOpen: false, viewMode: "split" });
+        },
+
+        openCalendar: () => {
+          set({ calendarOpen: true });
+        },
+
+        closeCalendar: () => {
+          set({ calendarOpen: false });
         },
 
         toggleFocusMode: () => {
