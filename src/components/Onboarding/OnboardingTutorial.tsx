@@ -66,7 +66,7 @@ Sound familiar?`,
 ✅ Connect ideas (like your mind does)
 ✅ Find anything instantly
 ✅ Keep it 100% private (your data, your device)
-✅ Think with AI assistance
+✅ Get AI-powered insights
 
 No cloud. No subscriptions. No tracking.
 Just you and your thoughts.`,

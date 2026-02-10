@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { X, Check, Moon, Sun, Monitor, Save, Archive } from "lucide-react";
+import { X, Check, Moon, Sun, Monitor, Save, Archive, FileJson, Download } from "lucide-react";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useNotesStore } from "../../stores/notesStore";
-import { exportAllNotesAsZip } from "../../lib/export";
+import { exportAllNotesAsZip, exportNotesAsJSON, exportFullBackup } from "../../lib/export";
 import { toast } from "sonner";
 import { cn } from "../../lib/utils";
 
@@ -185,17 +185,55 @@ export const SettingsModal: React.FC = () => {
                     </div>
 
                     <div className="pt-4 border-t">
-                      <h4 className="text-sm font-semibold mb-3">data export</h4>
-                      <button
-                        onClick={handleExportAll}
-                        disabled={exporting || notes.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Archive className="w-4 h-4" />
-                        {exporting ? "exporting..." : `export all notes (${notes.length})`}
-                      </button>
+                      <h4 className="text-sm font-semibold mb-3">Backup & Export</h4>
+                      <div className="space-y-3">
+                        <button
+                          onClick={handleExportAll}
+                          disabled={exporting || notes.length === 0}
+                          className="flex items-center gap-2 w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Archive className="w-4 h-4" />
+                          {exporting ? "exporting..." : `Export as ZIP (${notes.length} notes)`}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setExporting(true);
+                            try {
+                              exportNotesAsJSON(notes);
+                              toast.success("exported as JSON backup");
+                            } catch (error) {
+                              toast.error("failed to export");
+                            } finally {
+                              setExporting(false);
+                            }
+                          }}
+                          disabled={exporting || notes.length === 0}
+                          className="flex items-center gap-2 w-full px-4 py-2 border rounded-md hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <FileJson className="w-4 h-4" />
+                          Export as JSON (with metadata)
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setExporting(true);
+                            try {
+                              await exportFullBackup(notes);
+                              toast.success("full backup created");
+                            } catch (error) {
+                              toast.error("failed to create backup");
+                            } finally {
+                              setExporting(false);
+                            }
+                          }}
+                          disabled={exporting || notes.length === 0}
+                          className="flex items-center gap-2 w-full px-4 py-2 border rounded-md hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Download className="w-4 h-4" />
+                          Full Backup (ZIP + JSON)
+                        </button>
+                      </div>
                       <p className="text-xs text-muted-foreground mt-2">
-                        download all notes as a zip file
+                        Create backups to preserve your notes and metadata
                       </p>
                     </div>
                   </div>

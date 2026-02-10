@@ -33,6 +33,18 @@
 - **Related notes** — discover hidden connections
 - Works with [Ollama](https://ollama.ai) for 100% local AI
 
+### 📅 **Daily Notes & Templates**
+- One-click daily note creation
+- Built-in templates: Meeting Notes, Project, Journal
+- Customizable template system
+- Quick create from command palette
+
+### 📥 **Import & Export**
+- Import from Obsidian vaults (preserves [[links]])
+- Import markdown files and folders
+- Export as ZIP, JSON, or individual files
+- Full backup with metadata
+
 ### 🚀 **Built for Speed**
 - Instant search with `Cmd+K`
 - Keyboard-first design
@@ -44,6 +56,24 @@
 - Clean, distraction-free interface
 - Focus mode for deep writing
 - Split view editor/preview
+
+---
+
+## 🆚 How BrainVault Compares
+
+| Feature | BrainVault | Obsidian | Notion |
+|---------|------------|----------|--------|
+| **Local-first** | ✅ 100% local | ✅ Local files | ❌ Cloud-only |
+| **Free** | ✅ MIT License | ⚠️ Freemium | ⚠️ Freemium |
+| **Open source** | ✅ | ❌ | ❌ |
+| **Wiki links** | ✅ | ✅ | ⚠️ Limited |
+| **Knowledge graph** | ✅ 3D Graph | ✅ Graph view | ❌ |
+| **Local AI** | ✅ Ollama | ❌ | ❌ |
+| **Native desktop app** | ✅ Tauri | ✅ Electron | ❌ Web only |
+| **Mobile app** | 🚧 Planned | ✅ | ✅ |
+| **Offline support** | ✅ Full | ✅ Full | ⚠️ Limited |
+| **File format** | Markdown | Markdown | Proprietary |
+| **Import from Obsidian** | ✅ | N/A | ⚠️ Manual |
 
 ---
 
@@ -98,6 +128,39 @@ npm run tauri build
 
 ---
 
+## 🐳 Docker
+
+Run BrainVault in a container:
+
+```bash
+# Quick start
+docker compose up -d
+
+# Access at http://localhost:3000
+```
+
+Or build and run manually:
+
+```bash
+# Build the image
+docker build -t brainvault .
+
+# Run the container
+docker run -d -p 3000:80 --name brainvault brainvault
+```
+
+### With Local AI (Ollama)
+
+```bash
+# Start with Ollama support
+docker compose --profile ai up -d
+
+# Pull a model
+docker exec brainvault-ollama ollama pull llama2
+```
+
+---
+
 ## 🤖 Setting Up Local AI
 
 BrainVault works great without AI, but for the full experience:
@@ -129,6 +192,7 @@ BrainVault works great without AI, but for the full experience:
 | Action | Shortcut |
 |--------|----------|
 | New note | `Cmd+N` |
+| Daily note | `Cmd+D` |
 | Search | `Cmd+K` |
 | Toggle sidebar | `Cmd+B` |
 | Switch view mode | `Cmd+E` |
@@ -140,7 +204,15 @@ BrainVault works great without AI, but for the full experience:
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Built With
+
+<p align="center">
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React"/></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/></a>
+  <a href="https://tauri.app"><img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=white" alt="Tauri"/></a>
+  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS"/></a>
+  <a href="https://vitejs.dev"><img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite"/></a>
+</p>
 
 | Layer | Technology |
 |-------|------------|
@@ -151,7 +223,7 @@ BrainVault works great without AI, but for the full experience:
 | **Styling** | Tailwind CSS |
 | **Animations** | Framer Motion |
 | **Graph** | react-force-graph-3d |
-| **AI** | Ollama (local LLM) |
+| **AI** | Ollama (local inference) |
 | **Search** | Fuse.js + custom semantic search |
 
 ---
@@ -165,15 +237,20 @@ brainvault/
 │   │   ├── AI/         # AI chat interface
 │   │   ├── Editor/     # Markdown editor
 │   │   ├── Graph/      # Knowledge graph
+│   │   ├── Import/     # Import modal
+│   │   ├── Templates/  # Template modal
 │   │   └── ...
 │   ├── stores/         # Zustand state management
 │   ├── lib/            # Utilities & helpers
 │   │   ├── ai.ts       # AI/ML functions
+│   │   ├── import.ts   # Import utilities
+│   │   ├── templates.ts# Note templates
 │   │   └── ...
 │   ├── types/          # TypeScript types
 │   └── styles/         # Global styles
 ├── src-tauri/          # Tauri (Rust) backend
 ├── server/             # Optional API server
+├── docker/             # Docker configuration
 └── public/             # Static assets
 ```
 
