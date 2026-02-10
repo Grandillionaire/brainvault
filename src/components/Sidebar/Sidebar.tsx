@@ -15,10 +15,16 @@ import {
   MessageSquare,
   Edit2,
   Trash2,
+  Upload,
+  Calendar,
+  FileStack,
 } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
 import { useUIStore } from "../../stores/uiStore";
 import { cn, formatRelativeDate } from "../../lib/utils";
+import { getDailyNoteTitle, getDailyNoteContent } from "../../lib/templates";
+import { ImportModal } from "../Import/ImportModal";
+import { TemplateModal } from "../Templates/TemplateModal";
 
 interface TreeNode {
   id: string;
@@ -41,6 +47,7 @@ export const Sidebar: React.FC = () => {
     openSettings,
     openGraphView,
     openAIChat,
+    openCalendar,
     togglePinNote,
   } = useUIStore();
 
@@ -48,6 +55,8 @@ export const Sidebar: React.FC = () => {
   const [activeSection, setActiveSection] = useState<"files" | "tags" | "recent" | "pinned">("files");
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; note: any } | null>(null);
   const [newFolderModal, setNewFolderModal] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
 
   // Get all unique tags
   const allTags = useMemo(() => {
@@ -154,6 +163,19 @@ export const Sidebar: React.FC = () => {
     setContextMenu(null);
   };
 
+  const handleDailyNote = async () => {
+    const title = getDailyNoteTitle();
+    const existingNote = notes.find(n => n.title === title);
+    
+    if (existingNote) {
+      setCurrentNote(existingNote);
+    } else {
+      const content = getDailyNoteContent();
+      const note = await createNote(title, content);
+      setCurrentNote(note);
+    }
+  };
+
   const renderTree = (nodes: TreeNode[], level = 0) => {
     return nodes.map(node => {
       const isExpanded = expandedFolders.has(node.id);
@@ -213,6 +235,20 @@ export const Sidebar: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-semibold">BrainVault</h1>
           <div className="flex gap-1">
+            <button
+              onClick={handleDailyNote}
+              className="p-1 hover:bg-accent rounded-sm"
+              title="Daily Note (Cmd+D)"
+            >
+              <Calendar className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setTemplateModalOpen(true)}
+              className="p-1 hover:bg-accent rounded-sm"
+              title="New from Template"
+            >
+              <FileStack className="w-4 h-4" />
+            </button>
             <button
               onClick={() => setNewFolderModal(true)}
               className="p-1 hover:bg-accent rounded-sm"
@@ -391,6 +427,20 @@ export const Sidebar: React.FC = () => {
       {/* Footer */}
       <div className="p-2 border-t flex gap-2">
         <button
+          onClick={() => setImportModalOpen(true)}
+          className="flex-1 flex items-center justify-center gap-1 p-2 text-xs hover:bg-accent hover:text-accent-foreground rounded-sm"
+          title="Import Notes"
+        >
+          <Upload className="w-4 h-4" />
+        </button>
+        <button
+          onClick={openCalendar}
+          className="flex-1 flex items-center justify-center gap-1 p-2 text-xs hover:bg-accent hover:text-accent-foreground rounded-sm"
+          title="Calendar View"
+        >
+          <Calendar className="w-4 h-4" />
+        </button>
+        <button
           onClick={openGraphView}
           className="flex-1 flex items-center justify-center gap-1 p-2 text-xs hover:bg-accent hover:text-accent-foreground rounded-sm"
           title="Graph View"
@@ -412,6 +462,10 @@ export const Sidebar: React.FC = () => {
           <Settings className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Modals */}
+      <ImportModal isOpen={importModalOpen} onClose={() => setImportModalOpen(false)} />
+      <TemplateModal isOpen={templateModalOpen} onClose={() => setTemplateModalOpen(false)} />
 
       {/* Context Menu */}
       {contextMenu && (

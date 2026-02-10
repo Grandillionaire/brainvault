@@ -221,6 +221,15 @@
   }
 }
 
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -230,10 +239,206 @@
   }
 }
 
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .animate-slide-in {
   animation: slideIn 0.2s ease-out;
 }
 
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Shimmer loading effect */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted) / 0.5) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  @apply transition-all duration-200 ease-out;
+}
+
+/* Glass effect for modals and overlays */
+.glass {
+  @apply bg-background/80 backdrop-blur-md;
+}
+
+/* Hover lift effect */
+.hover-lift {
+  @apply transition-transform duration-200;
+}
+
+.hover-lift:hover {
+  @apply -translate-y-0.5;
+}
+
+/* Interactive button styles */
+.btn-interactive {
+  @apply transition-all duration-150 active:scale-[0.98];
+}
+
+/* Note card styles */
+.note-card {
+  @apply bg-card rounded-lg border p-4 transition-all duration-200;
+}
+
+.note-card:hover {
+  @apply shadow-md border-primary/20 -translate-y-0.5;
+}
+
+/* Selected state */
+.note-card.selected {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-background;
+}
+
+/* Link preview popup */
+.link-preview {
+  @apply absolute z-50 w-72 p-3 bg-popover/95 backdrop-blur-sm rounded-lg border shadow-xl;
+  @apply animate-scale-in;
+}
+
+/* Keyboard shortcut badge */
+.kbd {
+  @apply inline-flex items-center justify-center px-1.5 py-0.5;
+  @apply text-xs font-mono bg-muted rounded border border-border;
+  @apply shadow-sm;
+}
+
+/* Empty state styling */
+.empty-state {
+  @apply flex flex-col items-center justify-center text-center p-8;
+  @apply text-muted-foreground;
+}
+
+.empty-state-icon {
+  @apply w-16 h-16 mb-4 opacity-50;
+}
+
+/* Responsive design helpers */
+@layer utilities {
+  .container-narrow {
+    @apply max-w-2xl mx-auto px-4;
+  }
+  
+  .container-wide {
+    @apply max-w-6xl mx-auto px-4;
+  }
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  .ProseMirror {
+    @apply p-4;
+  }
+  
+  .sidebar {
+    @apply fixed inset-y-0 left-0 z-40 w-72 transform;
+    @apply -translate-x-full transition-transform duration-300;
+  }
+  
+  .sidebar.open {
+    @apply translate-x-0;
+  }
+  
+  .sidebar-overlay {
+    @apply fixed inset-0 bg-black/50 z-30 transition-opacity;
+  }
+}
+
+/* Print styles */
+@media print {
+  .sidebar,
+  .command-palette,
+  .ai-chat,
+  .graph-view {
+    @apply hidden;
+  }
+  
+  .ProseMirror {
+    @apply max-w-none p-0;
+  }
+}
+
+/* Selection highlight */
+::selection {
+  @apply bg-primary/20;
+}
+
+/* Focus ring styles */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
+}
+
+/* Prose dark mode enhancements */
+.dark .prose {
+  --tw-prose-body: hsl(var(--foreground));
+  --tw-prose-headings: hsl(var(--foreground));
+  --tw-prose-links: hsl(var(--primary));
+  --tw-prose-bold: hsl(var(--foreground));
+  --tw-prose-quotes: hsl(var(--muted-foreground));
+  --tw-prose-code: hsl(var(--foreground));
+  --tw-prose-pre-code: hsl(var(--foreground));
+  --tw-prose-pre-bg: hsl(var(--muted));
 }

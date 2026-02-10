@@ -18,11 +18,14 @@ import {
   Trash2,
   Archive,
   BookOpen,
+  Upload,
+  FileStack,
 } from "lucide-react";
 import { useUIStore } from "../../stores/uiStore";
 import { useNotesStore } from "../../stores/notesStore";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { exportNoteAsMarkdown, exportNoteAsPDF } from "../../lib/export";
+import { exportNoteAsMarkdown, exportNoteAsPDF, exportFullBackup } from "../../lib/export";
+import { getDailyNoteTitle, getDailyNoteContent, defaultTemplates, applyTemplate } from "../../lib/templates";
 import { toast } from "sonner";
 
 interface CommandItem {
@@ -83,21 +86,91 @@ export const CommandPalette: React.FC = () => {
     },
     {
       id: "daily-note",
-      name: "Open Daily Note",
+      name: "Daily Note",
       icon: <Calendar className="w-4 h-4" />,
       category: "File",
-      description: "Open today's daily note",
+      description: "Open or create today's daily note",
       shortcut: "⌘D",
       action: async () => {
-        const today = new Date().toISOString().split("T")[0];
-        const dailyNote = notes.find(n => n.title === `Daily Note - ${today}`);
+        const title = getDailyNoteTitle();
+        const dailyNote = notes.find(n => n.title === title);
         if (dailyNote) {
           setCurrentNote(dailyNote);
         } else {
-          const note = await createNote(`Daily Note - ${today}`, `# ${today}\n\n## Tasks\n- [ ] \n\n## Notes\n\n`);
+          const content = getDailyNoteContent();
+          const note = await createNote(title, content);
           setCurrentNote(note);
         }
         closeCommandPalette();
+      },
+    },
+    {
+      id: "new-from-template",
+      name: "New from Template",
+      icon: <FileStack className="w-4 h-4" />,
+      category: "File",
+      description: "Create a note from a template",
+      action: async () => {
+        // Quick create using Meeting template as default
+        const template = defaultTemplates.find(t => t.id === "meeting")!;
+        const { title, content } = applyTemplate(template);
+        const note = await createNote(title, content);
+        setCurrentNote(note);
+        closeCommandPalette();
+        toast.success("Created from template");
+      },
+    },
+    {
+      id: "template-meeting",
+      name: "New Meeting Notes",
+      icon: <FileStack className="w-4 h-4" />,
+      category: "Templates",
+      description: "Create meeting notes from template",
+      action: async () => {
+        const template = defaultTemplates.find(t => t.id === "meeting")!;
+        const { title, content } = applyTemplate(template);
+        const note = await createNote(title, content);
+        setCurrentNote(note);
+        closeCommandPalette();
+      },
+    },
+    {
+      id: "template-project",
+      name: "New Project",
+      icon: <FileStack className="w-4 h-4" />,
+      category: "Templates",
+      description: "Create project tracker from template",
+      action: async () => {
+        const template = defaultTemplates.find(t => t.id === "project")!;
+        const { title, content } = applyTemplate(template);
+        const note = await createNote(title, content);
+        setCurrentNote(note);
+        closeCommandPalette();
+      },
+    },
+    {
+      id: "template-journal",
+      name: "New Journal Entry",
+      icon: <FileStack className="w-4 h-4" />,
+      category: "Templates",
+      description: "Create journal entry from template",
+      action: async () => {
+        const template = defaultTemplates.find(t => t.id === "journal")!;
+        const { title, content } = applyTemplate(template);
+        const note = await createNote(title, content);
+        setCurrentNote(note);
+        closeCommandPalette();
+      },
+    },
+    {
+      id: "import-notes",
+      name: "Import Notes",
+      icon: <Upload className="w-4 h-4" />,
+      category: "File",
+      description: "Import from Markdown, Obsidian, or Notion",
+      action: () => {
+        closeCommandPalette();
+        toast.info("Use the Import button in the sidebar to import notes");
       },
     },
     {
@@ -313,6 +386,22 @@ export const CommandPalette: React.FC = () => {
           } catch {
             toast.error("failed to open print dialog");
           }
+        }
+        closeCommandPalette();
+      },
+    },
+    {
+      id: "export-backup",
+      name: "Full Backup",
+      icon: <Archive className="w-4 h-4" />,
+      category: "Export",
+      description: "Export all notes as ZIP + JSON backup",
+      action: async () => {
+        try {
+          await exportFullBackup(notes);
+          toast.success("backup created");
+        } catch {
+          toast.error("failed to create backup");
         }
         closeCommandPalette();
       },

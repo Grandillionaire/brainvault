@@ -7,6 +7,10 @@ import { AIChat } from "./components/AI/AIChat";
 import { OnboardingTutorial } from "./components/Onboarding/OnboardingTutorial";
 import { SettingsModal } from "./components/Settings/SettingsModal";
 import { ShortcutsModal } from "./components/Help/ShortcutsModal";
+import { CalendarView } from "./components/Calendar/CalendarView";
+import { PublishModal } from "./components/Publish/PublishModal";
+import { FlashcardMode } from "./components/Flashcards/FlashcardMode";
+import { VoiceNoteModal } from "./components/VoiceNote/VoiceRecorder";
 import { useNotesStore } from "./stores/notesStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useUIStore } from "./stores/uiStore";
@@ -15,7 +19,7 @@ import { cn } from "./lib/utils";
 import { ViewMode } from "./types";
 import ReactMarkdown from "react-markdown";
 import { Toaster, toast } from "sonner";
-import { Download, FileDown } from "lucide-react";
+import { Download, FileDown, Globe, Brain, Mic } from "lucide-react";
 import { exportNoteAsMarkdown, exportNoteAsPDF } from "./lib/export";
 import "./styles/globals.css";
 
@@ -33,6 +37,12 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [editorContent, setEditorContent] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [flashcardsOpen, setFlashcardsOpen] = useState(false);
+  const [voiceNoteOpen, setVoiceNoteOpen] = useState(false);
+  
+  const calendarOpen = useUIStore((state) => state.calendarOpen);
+  const closeCalendar = useUIStore((state) => state.closeCalendar);
 
   // Initialize app
   useEffect(() => {
@@ -241,6 +251,27 @@ function App() {
                 <Download className="w-4 h-4" />
               </button>
               <button
+                onClick={() => setPublishOpen(true)}
+                className="p-1 hover:bg-muted rounded transition-colors"
+                title="publish to web"
+              >
+                <Globe className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setFlashcardsOpen(true)}
+                className="p-1 hover:bg-muted rounded transition-colors"
+                title="study flashcards"
+              >
+                <Brain className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setVoiceNoteOpen(true)}
+                className="p-1 hover:bg-muted rounded transition-colors"
+                title="voice note"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+              <button
                 onClick={() => useUIStore.getState().togglePinNote(currentNote)}
                 className="p-1 hover:bg-muted rounded transition-colors"
                 title="pin note"
@@ -338,6 +369,36 @@ function App() {
 
       {/* Shortcuts Modal */}
       <ShortcutsModal />
+
+      {/* Calendar View */}
+      <CalendarView isOpen={calendarOpen} onClose={closeCalendar} />
+
+      {/* Publish Modal */}
+      <PublishModal 
+        isOpen={publishOpen} 
+        onClose={() => setPublishOpen(false)} 
+        note={currentNote} 
+      />
+
+      {/* Flashcard Mode */}
+      <FlashcardMode 
+        isOpen={flashcardsOpen} 
+        onClose={() => setFlashcardsOpen(false)} 
+        note={currentNote} 
+      />
+
+      {/* Voice Note Modal */}
+      <VoiceNoteModal
+        isOpen={voiceNoteOpen}
+        onClose={() => setVoiceNoteOpen(false)}
+        onTranscript={(text) => {
+          if (currentNote) {
+            const newContent = editorContent + "\n\n" + text;
+            setEditorContent(newContent);
+            updateNote(currentNote.id, { content: newContent });
+          }
+        }}
+      />
     </div>
   );
 }
