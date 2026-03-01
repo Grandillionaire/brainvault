@@ -32,19 +32,54 @@ const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: "same-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+      fontSrc: ["'self'"],
+    }
+  }
 }));
 
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:1420',
+  origin: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',')
+    : (process.env.CLIENT_URL || 'http://localhost:1420'),
   credentials: true
 }));
 app.use(compression());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(morgan('dev'));
+
+// Simple rate limiter
+const rateLimits = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX = 100; // requests per window
+
+function rateLimit(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW;
+
+  if (!rateLimits.has(ip)) rateLimits.set(ip, []);
+  const requests = rateLimits.get(ip).filter(t => t > windowStart);
+  requests.push(now);
+  rateLimits.set(ip, requests);
+
+  if (requests.length > RATE_LIMIT_MAX) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+  next();
+}
+
+// Apply before routes
+app.use(rateLimit);
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

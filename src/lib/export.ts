@@ -20,6 +20,15 @@ export const exportNoteAsMarkdown = (note: Note) => {
   saveAs(blob, filename);
 };
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 export const exportNoteAsPDF = (note: Note) => {
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
@@ -42,16 +51,19 @@ export const exportNoteAsPDF = (note: Note) => {
     </style>
   `;
 
+  const safeTitle = escapeHtml(note.title);
+  const safeContent = note.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
       <head>
-        <title>${note.title}</title>
+        <title>${safeTitle}</title>
         ${styles}
       </head>
       <body>
-        <h1>${note.title}</h1>
-        <div>${note.content.replace(/\n/g, "<br>")}</div>
+        <h1>${safeTitle}</h1>
+        <div>${safeContent}</div>
       </body>
     </html>
   `);
