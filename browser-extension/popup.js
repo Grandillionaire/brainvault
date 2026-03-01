@@ -114,7 +114,12 @@ function renderTags() {
   tags.forEach(tag => {
     const tagEl = document.createElement('span');
     tagEl.className = 'tag';
-    tagEl.innerHTML = `#${tag} <button onclick="removeTag('${tag}')">&times;</button>`;
+    const tagText = document.createTextNode('#' + tag + ' ');
+    tagEl.appendChild(tagText);
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = '\u00d7';
+    removeBtn.onclick = () => removeTag(tag);
+    tagEl.appendChild(removeBtn);
     container.insertBefore(tagEl, input);
   });
 }

@@ -303,8 +303,13 @@ export function saveAttachment(file, noteId) {
     fs.mkdirSync(attachmentsDir, { recursive: true });
   }
 
-  const filename = `${Date.now()}_${file.originalname}`;
+  const safeName = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_');
+  const filename = `${Date.now()}_${safeName}`;
   const filepath = path.join(attachmentsDir, filename);
+  // Verify the resolved path is still within attachmentsDir
+  if (!filepath.startsWith(attachmentsDir)) {
+    throw new Error('Invalid file path');
+  }
 
   fs.writeFileSync(filepath, file.buffer);
 
