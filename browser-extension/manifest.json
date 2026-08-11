@@ -3,7 +3,7 @@
   "name": "BrainVault Web Clipper",
   "version": "1.0.0",
   "description": "Clip web pages directly to BrainVault",
-  "permissions": ["activeTab", "storage", "scripting"],
+  "permissions": ["activeTab", "storage", "scripting", "contextMenus"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

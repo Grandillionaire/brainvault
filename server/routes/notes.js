@@ -12,7 +12,9 @@ import {
   saveNoteToFile,
   deleteNoteFile,
   createDailyNote,
-  extractTags
+  extractTags,
+  extractWikiLinks,
+  stripMarkdown
 } from '../services/vault.js';
 
 const router = express.Router();
@@ -204,31 +206,5 @@ router.get('/daily/:date?', async (req, res) => {
     res.status(500).json({ error: 'Failed to get daily note' });
   }
 });
-
-// Helper functions
-function extractWikiLinks(content) {
-  const regex = /\[\[([^\]]+)\]\]/g;
-  const links = [];
-  let match;
-
-  while ((match = regex.exec(content)) !== null) {
-    links.push(match[1]);
-  }
-
-  return [...new Set(links)];
-}
-
-function stripMarkdown(content) {
-  return content
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/\[\[([^\]]+)\]\]/g, '$1')
-    .replace(/#(\w+)/g, '$1')
-    .trim();
-}
 
 export default router;

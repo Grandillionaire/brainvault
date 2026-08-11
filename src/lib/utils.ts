@@ -68,7 +68,7 @@ export function extractWikiLinks(content: string): string[] {
   while ((match = regex.exec(content)) !== null) {
     matches.push(match[1]);
   }
-  return matches;
+  return [...new Set(matches)];
 }
 
 export function extractTags(content: string): string[] {
@@ -82,11 +82,14 @@ export function extractTags(content: string): string[] {
 }
 
 export function slugify(text: string): string {
+  // \p{L}\p{N} keeps non-latin scripts: `\w` alone maps every Japanese,
+  // Cyrillic or Greek title onto the same empty slug.
   return text
     .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
     .trim();
 }
 
@@ -124,10 +127,25 @@ export function parseMarkdownFrontmatter(content: string): {
     if (key && valueParts.length) {
       const value = valueParts.join(":").trim();
       metadata[key.trim()] = value.startsWith("[") && value.endsWith("]")
-        ? JSON.parse(value)
+        ? parseFlowSequence(value)
         : value;
     }
   });
 
   return { metadata, content: body };
+}
+
+/**
+ * Parse a YAML flow sequence such as `[work, personal]`.
+ * These are valid YAML but invalid JSON, so JSON.parse would throw and abort
+ * the whole file - and with it any batch import the caller was running.
+ */
+function parseFlowSequence(value: string): string[] {
+  const inner = value.slice(1, -1).trim();
+  if (!inner) return [];
+
+  return inner
+    .split(",")
+    .map(item => item.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean);
 }

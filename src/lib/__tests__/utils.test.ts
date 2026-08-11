@@ -6,6 +6,7 @@ import {
   truncate,
   getWordCount,
   getReadingTime,
+  parseMarkdownFrontmatter,
 } from "../utils";
 
 describe("extractWikiLinks", () => {
@@ -53,6 +54,46 @@ describe("slugify", () => {
     expect(slugify("Hello World")).toBe("hello-world");
     expect(slugify("Test 123!")).toBe("test-123");
     expect(slugify("Multiple   Spaces")).toBe("multiple-spaces");
+  });
+
+  it("should keep non-latin scripts instead of collapsing them to nothing", () => {
+    expect(slugify("日本語のノート")).toBe("日本語のノート");
+    expect(slugify("Заметка о работе")).toBe("заметка-о-работе");
+    expect(slugify("Σημείωση")).toBe("σημείωση");
+  });
+
+  it("should not produce a leading or trailing dash", () => {
+    expect(slugify("   ")).toBe("");
+    expect(slugify("!!!")).toBe("");
+    expect(slugify("- edge -")).toBe("edge");
+  });
+});
+
+describe("parseMarkdownFrontmatter", () => {
+  it("should parse an unquoted YAML flow sequence without throwing", () => {
+    const content = "---\ntags: [work, personal]\ntitle: My Note\n---\nbody";
+
+    const { metadata, content: body } = parseMarkdownFrontmatter(content);
+
+    expect(metadata.tags).toEqual(["work", "personal"]);
+    expect(metadata.title).toBe("My Note");
+    expect(body).toBe("body");
+  });
+
+  it("should parse a quoted JSON-style sequence too", () => {
+    const { metadata } = parseMarkdownFrontmatter('---\ntags: ["a", "b"]\n---\nbody');
+    expect(metadata.tags).toEqual(["a", "b"]);
+  });
+
+  it("should return an empty array for an empty sequence", () => {
+    const { metadata } = parseMarkdownFrontmatter("---\ntags: []\n---\nbody");
+    expect(metadata.tags).toEqual([]);
+  });
+
+  it("should return the content untouched when there is no frontmatter", () => {
+    const { metadata, content } = parseMarkdownFrontmatter("# Just a note");
+    expect(metadata).toEqual({});
+    expect(content).toBe("# Just a note");
   });
 });
 

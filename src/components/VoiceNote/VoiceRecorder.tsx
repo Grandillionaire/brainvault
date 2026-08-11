@@ -1,12 +1,27 @@
 /**
  * Voice Recorder Component
- * Record and transcribe voice notes using Web Speech API
+ * Record and transcribe voice notes using the Web Speech API.
+ *
+ * PRIVACY: this is the one part of BrainVault that is not local. In Chrome and
+ * Edge the Web Speech API is not on-device - the audio is streamed to the
+ * browser vendor's speech service for transcription. Nothing here may run
+ * before the user has been told that and has agreed to it.
  */
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Mic, Square, X, Check } from "lucide-react";
+import { Mic, Square, X, Check, ShieldAlert } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
+
+const CONSENT_KEY = "brainvault_speech_consent";
+
+function hasSpeechConsent(): boolean {
+  return localStorage.getItem(CONSENT_KEY) === "granted";
+}
+
+function grantSpeechConsent(): void {
+  localStorage.setItem(CONSENT_KEY, "granted");
+}
 
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
@@ -56,6 +71,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const [interimTranscript, setInterimTranscript] = useState("");
   const [audioLevel, setAudioLevel] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [consented, setConsented] = useState(hasSpeechConsent);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -177,6 +193,12 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       return;
     }
 
+    // Never open the microphone before the user has accepted that the audio
+    // leaves the machine
+    if (!consented) {
+      return;
+    }
+
     setTranscript("");
     setInterimTranscript("");
     setDuration(0);
@@ -259,6 +281,46 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       <div className="p-4 text-center text-muted-foreground">
         <p>Speech recognition is not supported in this browser.</p>
         <p className="text-sm mt-2">Try Chrome, Edge, or Safari.</p>
+      </div>
+    );
+  }
+
+  if (!consented) {
+    return (
+      <div className="p-6 space-y-4">
+        <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+          <ShieldAlert className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+          <div className="text-sm space-y-2">
+            <p className="font-medium">This feature is not local</p>
+            <p className="text-muted-foreground">
+              Voice notes use your browser's Web Speech API. In Chrome and Edge
+              that is not on-device: your recorded audio is sent to the browser
+              vendor's speech service to be transcribed. Everything else in
+              BrainVault stays on your machine - this does not.
+            </p>
+            <p className="text-muted-foreground">
+              Do not dictate anything confidential unless you are comfortable
+              with that.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm bg-muted hover:bg-accent rounded-md transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              grantSpeechConsent();
+              setConsented(true);
+            }}
+            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            I understand, enable voice notes
+          </button>
+        </div>
       </div>
     );
   }
@@ -373,6 +435,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       {/* Tips */}
       <p className="text-xs text-center text-muted-foreground">
         Speak clearly. Transcription happens in real-time.
+      </p>
+      <p className="text-xs text-center text-yellow-600 dark:text-yellow-500">
+        Audio is transcribed by your browser's speech service, not on this
+        machine.
       </p>
     </div>
   );

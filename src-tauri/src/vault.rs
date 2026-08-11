@@ -61,15 +61,14 @@ impl Vault {
 
     pub fn create_note(&self, title: &str, content: &str, tags: Vec<String>) -> Result<Note> {
         let id = Uuid::new_v4().to_string();
-        let file_name = format!("{}.md", slugify(title));
-        let file_path = self.config.notes_folder.join(&file_name);
+        let file_path = self.free_note_path(title);
 
         // Create frontmatter
         let frontmatter = create_frontmatter(&id, title, &tags);
         let full_content = format!("{}\n\n{}", frontmatter, content);
 
         // Write to file
-        fs::write(&file_path, &full_content)?;
+        write_atomic(&file_path, &full_content)?;
 
         // Extract metadata
         let plain_content = strip_markdown(content);
@@ -93,6 +92,29 @@ impl Vault {
         })
     }
 
+    /// Pick a file name no other note already occupies.
+    ///
+    /// The slug alone is not unique: a second note titled "Meeting Notes"
+    /// would truncate and replace the first one's file.
+    fn free_note_path(&self, title: &str) -> PathBuf {
+        let mut base = slugify(title);
+        if base.is_empty() {
+            base = "untitled".to_string();
+        }
+
+        let mut candidate = self.config.notes_folder.join(format!("{}.md", base));
+        let mut counter = 1;
+        while candidate.exists() {
+            counter += 1;
+            candidate = self
+                .config
+                .notes_folder
+                .join(format!("{}-{}.md", base, counter));
+        }
+
+        candidate
+    }
+
     pub fn update_note(&self, id: &str, content: &str) -> Result<Note> {
         // Find the note file
         let note_path = self.find_note_file(id)?;
@@ -114,7 +136,7 @@ impl Vault {
         let full_content = format!("{}\n\n{}", new_frontmatter, content);
 
         // Write to file
-        fs::write(&note_path, &full_content)?;
+        write_atomic(&note_path, &full_content)?;
 
         // Return updated note
         Ok(Note {
@@ -234,7 +256,11 @@ impl Vault {
             if entry.file_type().is_file() {
                 let path = entry.path();
                 if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                    let content = fs::read_to_string(path)?;
+                    // One unreadable file (non-UTF-8, half-written, binary with
+                    // a .md name) must not abort the search for every note.
+                    let Ok(content) = fs::read_to_string(path) else {
+                        continue;
+                    };
                     if let Ok((frontmatter, _)) = parse_frontmatter(&content) {
                         if frontmatter.get("id").map(|s| s == id).unwrap_or(false) {
                             return Ok(path.to_path_buf());
@@ -290,6 +316,16 @@ impl Vault {
 }
 
 // Helper functions
+
+/// Write via a temp file and rename, so an interrupted or failing write can
+/// never leave a truncated note behind.
+fn write_atomic(path: &Path, contents: &str) -> Result<()> {
+    let temp_path = path.with_extension("md.tmp");
+    fs::write(&temp_path, contents)?;
+    fs::rename(&temp_path, path)?;
+    Ok(())
+}
+
 fn slugify(text: &str) -> String {
     text.to_lowercase()
         .chars()
@@ -404,4 +440,98 @@ fn default_daily_template() -> String {
 
 ## 🙏 Gratitude
 "#.to_string()
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_vault() -> (Vault, PathBuf) {
+        let base = std::env::temp_dir().join(format!("brainvault-test-{}", Uuid::new_v4()));
+        let config = VaultConfig {
+            path: base.clone(),
+            notes_folder: base.join("notes"),
+            attachments_folder: base.join("attachments"),
+            templates_folder: base.join("templates"),
+            daily_notes_folder: base.join("notes").join("daily"),
+        };
+        (Vault::new(config).expect("vault"), base)
+    }
+
+    #[test]
+    fn create_note_does_not_overwrite_a_same_titled_note() {
+        let (vault, base) = temp_vault();
+
+        let first = vault
+            .create_note("Meeting Notes", "first body", vec![])
+            .expect("first");
+        let second = vault
+            .create_note("Meeting Notes", "second body", vec![])
+            .expect("second");
+
+        assert_ne!(first.path, second.path);
+        let first_on_disk = fs::read_to_string(first.path.clone().unwrap()).unwrap();
+        assert!(first_on_disk.contains("first body"));
+
+        fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn create_note_falls_back_when_the_title_has_no_slug_characters() {
+        let (vault, base) = temp_vault();
+
+        let note = vault.create_note("!!!", "body", vec![]).expect("note");
+
+        assert!(note.path.unwrap().ends_with("untitled.md"));
+        fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn find_note_file_skips_files_it_cannot_read_as_utf8() {
+        let (vault, base) = temp_vault();
+
+        let note = vault.create_note("Real Note", "body", vec![]).expect("note");
+        // A latin-1 note or a stray binary with a .md extension
+        fs::write(vault.config.notes_folder.join("broken.md"), [0xff, 0xfe, 0x00]).unwrap();
+
+        let found = vault.find_note_file(&note.id).expect("still finds the note");
+        assert_eq!(found, PathBuf::from(note.path.unwrap()));
+
+        // The whole folder must still be searchable: the bad file may sort
+        // after the note we want, so the failure only shows on a full scan.
+        let err = vault
+            .find_note_file("no-such-id")
+            .expect_err("missing note should be reported as missing");
+        assert!(
+            err.to_string().contains("not found"),
+            "one unreadable file aborted the search: {err}"
+        );
+
+        fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn update_note_leaves_no_temp_file_behind() {
+        let (vault, base) = temp_vault();
+
+        let note = vault.create_note("Journal", "v1", vec![]).expect("note");
+        vault.update_note(&note.id, "v2").expect("update");
+
+        let mut names: Vec<String> = fs::read_dir(&vault.config.notes_folder)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+        assert_eq!(names, vec!["journal.md".to_string()]);
+
+        fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn slugify_keeps_non_latin_scripts() {
+        assert_eq!(slugify("日本語のノート"), "日本語のノート");
+        assert_eq!(slugify("Заметка о работе"), "заметка-о-работе");
+        assert_eq!(slugify("!!!"), "");
+    }
 }

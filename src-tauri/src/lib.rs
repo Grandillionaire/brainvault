@@ -27,7 +27,14 @@ async fn create_note(
         .create_note(&title, &content, tags)
         .map_err(|e| e.to_string())?;
 
-    db.create_note(&note).map_err(|e| e.to_string())?;
+    // The file is already on disk. If the database rejects the note, remove it
+    // again rather than leaving an orphan the app cannot see.
+    if let Err(e) = db.create_note(&note) {
+        if let Some(path) = note.path.as_ref() {
+            let _ = std::fs::remove_file(path);
+        }
+        return Err(e.to_string());
+    }
 
     Ok(note)
 }
@@ -41,10 +48,24 @@ async fn update_note(
     let vault = state.vault.lock().map_err(|e| e.to_string())?;
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
-    let _note = vault.update_note(&id, &content).map_err(|e| e.to_string())?;
-    let updated = db.update_note(&id, &content).map_err(|e| e.to_string())?;
+    // Remember the committed body so the file can be put back if the database
+    // write fails - otherwise disk and database silently disagree.
+    let previous = db
+        .get_note(&id)
+        .map_err(|e| e.to_string())?
+        .map(|note| note.content);
 
-    Ok(updated)
+    vault.update_note(&id, &content).map_err(|e| e.to_string())?;
+
+    match db.update_note(&id, &content) {
+        Ok(updated) => Ok(updated),
+        Err(e) => {
+            if let Some(previous) = previous {
+                let _ = vault.update_note(&id, &previous);
+            }
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]
@@ -145,7 +166,16 @@ async fn init_vault(state: State<'_, AppState>) -> Result<(), String> {
 pub fn run() {
     // Initialize vault and database
     let vault_config = VaultConfig::default();
-    let vault = Vault::new(vault_config).expect("Failed to initialize vault");
+    let vault_path = vault_config.path.clone();
+    let vault = match Vault::new(vault_config) {
+        Ok(vault) => vault,
+        Err(e) => {
+            // A read-only Documents folder or a denied permission prompt used to
+            // panic here with no explanation of what to fix.
+            eprintln!("BrainVault could not open its vault at {:?}: {}", vault_path, e);
+            std::process::exit(1);
+        }
+    };
 
     let db_path = dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
@@ -154,7 +184,13 @@ pub fn run() {
 
     std::fs::create_dir_all(db_path.parent().unwrap()).ok();
 
-    let db = Database::new(&db_path).expect("Failed to initialize database");
+    let db = match Database::new(&db_path) {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("BrainVault could not open its database at {:?}: {}", db_path, e);
+            std::process::exit(1);
+        }
+    };
 
     let app_state = AppState {
         db: Arc::new(Mutex::new(db)),

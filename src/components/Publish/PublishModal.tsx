@@ -1,14 +1,19 @@
 /**
  * Publish Modal Component
- * Generate shareable links for notes and manage published content
+ *
+ * BrainVault is local-first: there is no BrainVault server that could host a
+ * note, so "publish" exports a self-contained HTML page the user hosts
+ * themselves. It deliberately does not show a share URL or view counts - a
+ * link this app cannot serve would 404 for whoever the user sends it to.
  */
 
 import React, { useState, useMemo } from "react";
-import { X, Globe, Copy, Check, ExternalLink, Eye, Lock, Link2 } from "lucide-react";
+import { X, Globe, Check, Eye, FileDown } from "lucide-react";
 import { Note } from "../../types";
 import { useNotesStore } from "../../stores/notesStore";
+import { exportNoteAsHtmlPage } from "../../lib/export";
+import { slugify } from "../../lib/utils";
 import { toast } from "sonner";
-import { cn } from "../../lib/utils";
 
 interface PublishModalProps {
   isOpen: boolean;
@@ -20,22 +25,15 @@ interface PublishedNote {
   noteId: string;
   slug: string;
   publishedAt: string;
-  isPublic: boolean;
-  views: number;
+  filename: string;
 }
 
 // Generate URL-friendly slug from title
 function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim()
-    .substring(0, 50);
+  return slugify(title).substring(0, 50);
 }
 
-// Mock storage for published notes (in real app, this would be server-side)
+// Which notes have been exported as a page, so the UI can show it
 const getPublishedNotes = (): PublishedNote[] => {
   const stored = localStorage.getItem("brainvault_published");
   return stored ? JSON.parse(stored) : [];
@@ -59,8 +57,7 @@ const unpublishNote = (noteId: string): void => {
 
 export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, note }) => {
   const { updateNote } = useNotesStore();
-  const [copied, setCopied] = useState(false);
-  const [isPublic, setIsPublic] = useState(true);
+  const [exported, setExported] = useState(false);
 
   const publishedNote = useMemo(() => {
     if (!note) return null;
@@ -68,18 +65,17 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, not
   }, [note]);
 
   const isPublished = !!publishedNote;
-  const slug = publishedNote?.slug || (note ? generateSlug(note.title) : "");
-  const shareUrl = `https://brainvault.app/p/${slug}`;
 
   if (!isOpen || !note) return null;
 
   const handlePublish = async () => {
+    const filename = exportNoteAsHtmlPage(note);
+
     const published: PublishedNote = {
       noteId: note.id,
       slug: generateSlug(note.title),
       publishedAt: new Date().toISOString(),
-      isPublic,
-      views: 0,
+      filename,
     };
 
     savePublishedNote(published);
@@ -94,7 +90,9 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, not
       },
     });
 
-    toast.success("Note published!");
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
+    toast.success(`Saved ${filename}`);
   };
 
   const handleUnpublish = async () => {
@@ -113,17 +111,6 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, not
     onClose();
   };
 
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      toast.success("Link copied!");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-background border rounded-lg shadow-2xl w-full max-w-lg">
@@ -135,7 +122,9 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, not
             </div>
             <div>
               <h2 className="text-lg font-semibold">Publish to Web</h2>
-              <p className="text-sm text-muted-foreground">Share this note with anyone</p>
+              <p className="text-sm text-muted-foreground">
+                Save this note as a standalone page you can host
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-accent rounded-md transition-colors">
@@ -172,81 +161,25 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, not
             </div>
           </div>
 
-          {/* Share Link */}
-          {isPublished && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Share Link</label>
-              <div className="flex gap-2">
-                <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted rounded-md">
-                  <Link2 className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm truncate">{shareUrl}</span>
-                </div>
-                <button
-                  onClick={handleCopyLink}
-                  className={cn(
-                    "px-3 py-2 rounded-md transition-colors",
-                    copied ? "bg-green-500 text-white" : "bg-primary text-primary-foreground hover:bg-primary/90"
-                  )}
-                >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </button>
-                <a
-                  href={shareUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-2 bg-muted hover:bg-accent rounded-md transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
-          )}
-
-          {/* Visibility Toggle */}
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              {isPublic ? (
-                <Globe className="w-5 h-5 text-green-500" />
-              ) : (
-                <Lock className="w-5 h-5 text-yellow-500" />
-              )}
-              <div>
-                <p className="font-medium">{isPublic ? "Public" : "Link Only"}</p>
-                <p className="text-sm text-muted-foreground">
-                  {isPublic
-                    ? "Anyone can find and view this note"
-                    : "Only people with the link can view"}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsPublic(!isPublic)}
-              className={cn(
-                "relative w-12 h-6 rounded-full transition-colors",
-                isPublic ? "bg-green-500" : "bg-muted-foreground/30"
-              )}
-            >
-              <div
-                className={cn(
-                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-transform",
-                  isPublic ? "left-7" : "left-1"
-                )}
-              />
-            </button>
+          {/* Where the page goes */}
+          <div className="p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+            BrainVault has no server of its own, so publishing writes a
+            self-contained <code>.html</code> file to your downloads. Put it on
+            any static host (GitHub Pages, Netlify, your own server) to share it.
           </div>
 
-          {/* Stats (if published) */}
+          {/* Last export (if published) */}
           {isPublished && publishedNote && (
             <div className="grid grid-cols-2 gap-4">
               <div className="p-3 bg-muted/50 rounded-lg text-center">
-                <p className="text-2xl font-bold">{publishedNote.views}</p>
-                <p className="text-xs text-muted-foreground">Views</p>
+                <p className="text-sm font-medium truncate">{publishedNote.filename}</p>
+                <p className="text-xs text-muted-foreground">File</p>
               </div>
               <div className="p-3 bg-muted/50 rounded-lg text-center">
                 <p className="text-sm font-medium">
                   {new Date(publishedNote.publishedAt).toLocaleDateString()}
                 </p>
-                <p className="text-xs text-muted-foreground">Published</p>
+                <p className="text-xs text-muted-foreground">Last exported</p>
               </div>
             </div>
           )}
@@ -263,10 +196,11 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, not
                 Unpublish
               </button>
               <button
-                onClick={handleCopyLink}
-                className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                onClick={handlePublish}
+                className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center gap-2"
               >
-                {copied ? "Copied!" : "Copy Link"}
+                {exported ? <Check className="w-4 h-4" /> : <FileDown className="w-4 h-4" />}
+                {exported ? "Saved" : "Export again"}
               </button>
             </>
           ) : (
@@ -281,8 +215,8 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, not
                 onClick={handlePublish}
                 className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center gap-2"
               >
-                <Globe className="w-4 h-4" />
-                Publish
+                <FileDown className="w-4 h-4" />
+                Export page
               </button>
             </>
           )}

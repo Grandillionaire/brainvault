@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { Note } from "../types";
+import { markdownToHtml } from "./markdown";
 
 export interface BackupData {
   version: string;
@@ -74,9 +75,29 @@ export const exportNoteAsPDF = (note: Note) => {
   }, 250);
 };
 
-export const exportAllNotesAsZip = async (notes: Note[]) => {
-  const zip = new JSZip();
+/**
+ * JSZip silently overwrites an entry that already exists, so two notes with the
+ * same path/title would collapse into one file. Reserve each name and suffix
+ * duplicates instead.
+ */
+const uniqueEntryName = (taken: Set<string>, folderKey: string, name: string): string => {
+  const extension = name.endsWith(".md") ? ".md" : "";
+  const base = extension ? name.slice(0, -extension.length) : name;
+
+  let candidate = name;
+  let counter = 1;
+  while (taken.has(`${folderKey}/${candidate}`)) {
+    counter++;
+    candidate = `${base}-${counter}${extension}`;
+  }
+
+  taken.add(`${folderKey}/${candidate}`);
+  return candidate;
+};
+
+const addNotesToZip = (root: JSZip, notes: Note[]) => {
   const folderMap = new Map<string, JSZip>();
+  const takenNames = new Set<string>();
 
   notes.forEach((note) => {
     const content = `# ${note.title}\n\n${note.content}`;
@@ -84,7 +105,7 @@ export const exportAllNotesAsZip = async (notes: Note[]) => {
     const pathParts = safePath.split("/");
 
     if (pathParts.length > 1) {
-      let currentFolder = zip;
+      let currentFolder = root;
       for (let i = 0; i < pathParts.length - 1; i++) {
         const folderName = pathParts[i];
         const folderKey = pathParts.slice(0, i + 1).join("/");
@@ -96,11 +117,62 @@ export const exportAllNotesAsZip = async (notes: Note[]) => {
           currentFolder = folderMap.get(folderKey)!;
         }
       }
-      currentFolder.file(pathParts[pathParts.length - 1], content);
+      const folderKey = pathParts.slice(0, -1).join("/");
+      const filename = pathParts[pathParts.length - 1];
+      currentFolder.file(uniqueEntryName(takenNames, folderKey, filename), content);
     } else {
-      zip.file(safePath.replace(/[/\\?%*:|"<>]/g, "-"), content);
+      const filename = safePath.replace(/[/\\?%*:|"<>]/g, "-");
+      root.file(uniqueEntryName(takenNames, "", filename), content);
     }
   });
+};
+
+/**
+ * Export a note as a self-contained HTML page the user can host anywhere.
+ * BrainVault runs entirely on the user's machine, so there is no service that
+ * could host a note for them - the page has to be something they own.
+ */
+export const exportNoteAsHtmlPage = (note: Note) => {
+  const safeTitle = escapeHtml(note.title);
+  const page = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${safeTitle}</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.6;
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 0 20px;
+        color: #1a1a1a;
+      }
+      pre { background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; }
+      code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #111; color: #eee; }
+        pre, code { background: #1e1e1e; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>${safeTitle}</h1>
+    ${markdownToHtml(note.content || "")}
+  </body>
+</html>`;
+
+  const blob = new Blob([page], { type: "text/html;charset=utf-8" });
+  const filename = `${note.title.replace(/[/\\?%*:|"<>]/g, "-")}.html`;
+  saveAs(blob, filename);
+
+  return filename;
+};
+
+export const exportAllNotesAsZip = async (notes: Note[]) => {
+  const zip = new JSZip();
+  addNotesToZip(zip, notes);
 
   const blob = await zip.generateAsync({ type: "blob" });
   const timestamp = new Date().toISOString().split("T")[0];
@@ -148,34 +220,10 @@ export const exportNotesAsJSON = (notes: Note[]) => {
  */
 export const exportFullBackup = async (notes: Note[]) => {
   const zip = new JSZip();
-  const folderMap = new Map<string, JSZip>();
 
   // Add markdown folder
   const mdFolder = zip.folder("markdown")!;
-  
-  notes.forEach((note) => {
-    const content = `# ${note.title}\n\n${note.content}`;
-    const safePath = note.path || `${note.title}.md`;
-    const pathParts = safePath.split("/");
-
-    if (pathParts.length > 1) {
-      let currentFolder = mdFolder;
-      for (let i = 0; i < pathParts.length - 1; i++) {
-        const folderName = pathParts[i];
-        const folderKey = pathParts.slice(0, i + 1).join("/");
-
-        if (!folderMap.has(folderKey)) {
-          currentFolder = currentFolder.folder(folderName)!;
-          folderMap.set(folderKey, currentFolder);
-        } else {
-          currentFolder = folderMap.get(folderKey)!;
-        }
-      }
-      currentFolder.file(pathParts[pathParts.length - 1], content);
-    } else {
-      mdFolder.file(safePath.replace(/[/\\?%*:|"<>]/g, "-"), content);
-    }
-  });
+  addNotesToZip(mdFolder, notes);
 
   // Add JSON backup
   const backup: BackupData = {
@@ -205,8 +253,11 @@ Notes: ${notes.length}
 
 To restore this backup:
 1. Open BrainVault
-2. Go to Settings > Import
-3. Select the \`backup.json\` file or the \`markdown/\` folder
+2. Click "Import" in the sidebar
+3. Choose "Backup" and select the \`backup.json\` file
+
+Importing the \`markdown/\` folder instead ("Folder" mode) restores the note
+bodies but not ids, backlinks or original timestamps.
 `;
   zip.file("README.md", readme);
 

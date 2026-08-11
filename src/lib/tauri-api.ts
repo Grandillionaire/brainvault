@@ -11,6 +11,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import type { Note } from '../types';
+import httpApi from './api';
 
 class TauriApiError extends Error {
   constructor(message: string) {
@@ -60,21 +61,18 @@ export const notesApi = {
 
   /**
    * Update a note's content
+   *
+   * Mirrors the HTTP client's signature so both backends are interchangeable;
+   * the Rust command only persists the body.
    */
-  update: (id: string, content: string) =>
-    invokeCommand<Note>('update_note', { id, content }),
+  update: (id: string, data: Partial<Note>) =>
+    invokeCommand<Note>('update_note', { id, content: data.content ?? '' }),
 
   /**
    * Delete a note
    */
   delete: (id: string) =>
-    invokeCommand<boolean>('delete_note', { id }),
-
-  /**
-   * Get or create today's daily note
-   */
-  getDailyNote: () =>
-    invokeCommand<Note>('get_daily_note'),
+    invokeCommand<boolean>('delete_note', { id }).then((success) => ({ success })),
 };
 
 /**
@@ -84,20 +82,17 @@ export const searchApi = {
   /**
    * Full-text search with FTS5
    */
-  search: (query: string) =>
-    invokeCommand<Array<{ note: Note; score: number; snippet: string }>>('search_notes', { query }),
+  search: async (params: { q?: string }) => {
+    const results = await invokeCommand<Array<{ note: Note; score: number; snippet: string }>>(
+      'search_notes',
+      { query: params.q ?? '' }
+    );
 
-  /**
-   * Get all tags with counts
-   */
-  getTags: () =>
-    invokeCommand<Array<{ name: string; count: number }>>('get_tags'),
-
-  /**
-   * Search suggestions for autocomplete
-   */
-  getSuggestions: (query: string) =>
-    invokeCommand<string[]>('get_suggestions', { query }),
+    return {
+      results: results.map((r) => ({ ...r.note, score: r.score })),
+      total: results.length,
+    };
+  },
 };
 
 /**
@@ -108,23 +103,26 @@ export const settingsApi = {
    * Get all settings as JSON
    */
   getAll: () =>
-    invokeCommand<Record<string, unknown>>('get_settings'),
+    invokeCommand<Record<string, any>>('get_settings'),
 
   /**
    * Update settings (merge with existing)
    */
-  update: (settings: Record<string, unknown>) =>
-    invokeCommand<void>('update_settings', { settings }),
+  updateBulk: (settings: Record<string, any>) =>
+    invokeCommand<void>('update_settings', { settings }).then(() => settings),
 
   /**
    * Reset all settings to defaults
    */
   reset: () =>
-    invokeCommand<void>('reset_settings'),
+    invokeCommand<void>('reset_settings').then(() => ({} as Record<string, any>)),
 };
 
 /**
  * Vault API (File System Operations)
+ *
+ * Only commands registered in `src-tauri/src/lib.rs` invoke_handler belong
+ * here - anything else rejects at runtime.
  */
 export const vaultApi = {
   /**
@@ -132,24 +130,6 @@ export const vaultApi = {
    */
   init: () =>
     invokeCommand<void>('init_vault'),
-
-  /**
-   * Get vault path
-   */
-  getPath: () =>
-    invokeCommand<string>('get_vault_path'),
-
-  /**
-   * Export note as markdown file
-   */
-  exportNote: (id: string, path: string) =>
-    invokeCommand<void>('export_note', { id, path }),
-
-  /**
-   * Import markdown file as note
-   */
-  importNote: (path: string) =>
-    invokeCommand<Note>('import_note', { path }),
 };
 
 /**
@@ -171,18 +151,12 @@ export default tauriApi;
  * Utility: Check if running in Tauri
  */
 export function isTauri(): boolean {
-  return '__TAURI__' in window;
+  return typeof window !== 'undefined' && '__TAURI__' in window;
 }
 
 /**
- * Utility: Get appropriate API (Tauri or HTTP fallback)
+ * Utility: Get appropriate API (Tauri in the desktop app, HTTP in the browser)
  */
 export function getApi() {
-  if (isTauri()) {
-    return tauriApi;
-  } else {
-    // Fallback to HTTP API for web version
-    console.warn('Running in browser mode - some features may be limited');
-    return tauriApi; // You could import the HTTP api.ts here as fallback
-  }
+  return isTauri() ? tauriApi : httpApi;
 }
