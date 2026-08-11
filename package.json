@@ -8,12 +8,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Grandillionaire/brainvault"
+    "url": "https://github.com/maximilliangrand/brainvault"
   },
   "bugs": {
-    "url": "https://github.com/Grandillionaire/brainvault/issues"
+    "url": "https://github.com/maximilliangrand/brainvault/issues"
   },
-  "homepage": "https://github.com/Grandillionaire/brainvault#readme",
+  "homepage": "https://github.com/maximilliangrand/brainvault#readme",
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"

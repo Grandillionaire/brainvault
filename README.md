@@ -82,7 +82,7 @@ the microphone is opened and the feature stays off until you accept. See
 
 ```bash
 # Clone the repository
-git clone https://github.com/Grandillionaire/brainvault
+git clone https://github.com/maximilliangrand/brainvault
 cd brainvault
 
 # Install dependencies
