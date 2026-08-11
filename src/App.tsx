@@ -21,6 +21,8 @@ import ReactMarkdown from "react-markdown";
 import { Toaster, toast } from "sonner";
 import { Download, FileDown, Globe, Brain, Mic } from "lucide-react";
 import { exportNoteAsMarkdown, exportNoteAsPDF } from "./lib/export";
+import { healthApi, realtimeClient } from "./lib/api";
+import { Note } from "./types";
 import "./styles/globals.css";
 
 function App() {
@@ -76,11 +78,58 @@ function App() {
     init();
   }, []);
 
+  // Live updates from the optional API server (file watcher, other clients).
+  // Only connect when a server actually answers, so the default offline flow
+  // does not spin on a dead socket.
+  useEffect(() => {
+    let cancelled = false;
+
+    const upsert = (note: Note) => {
+      useNotesStore.setState((state) => {
+        const index = state.notes.findIndex((n) => n.id === note.id);
+        const notes = [...state.notes];
+        if (index === -1) {
+          notes.push(note);
+        } else {
+          notes[index] = note;
+        }
+        return { notes };
+      });
+    };
+
+    const remove = ({ id }: { id: string }) => {
+      useNotesStore.setState((state) => ({
+        notes: state.notes.filter((n) => n.id !== id),
+        currentNote: state.currentNote?.id === id ? null : state.currentNote,
+      }));
+    };
+
+    healthApi
+      .check()
+      .then(() => {
+        if (cancelled) return;
+        realtimeClient.on("note:created", upsert);
+        realtimeClient.on("note:updated", upsert);
+        realtimeClient.on("note:deleted", remove);
+        realtimeClient.connect();
+      })
+      .catch(() => {
+        // No server - the app runs fully local, nothing to subscribe to.
+      });
+
+    return () => {
+      cancelled = true;
+      realtimeClient.off("note:created", upsert);
+      realtimeClient.off("note:updated", upsert);
+      realtimeClient.off("note:deleted", remove);
+      realtimeClient.disconnect();
+    };
+  }, []);
+
   // Update editor content when current note changes
   useEffect(() => {
     if (currentNote) {
-      // TipTap editor expects HTML or will convert markdown to HTML
-      // Set content directly, the editor will handle it
+      // Notes are stored as markdown; the editor converts to/from HTML itself
       setEditorContent(currentNote.content || "");
       useUIStore.getState().addRecentNote(currentNote);
     } else {
@@ -354,15 +403,6 @@ function App() {
 
       {/* Onboarding Tutorial */}
       <OnboardingTutorial />
-
-      {/* Command Palette */}
-      <CommandPalette />
-
-      {/* Graph View */}
-      <GraphView />
-
-      {/* AI Chat */}
-      <AIChat />
 
       {/* Settings Modal */}
       <SettingsModal />

@@ -411,6 +411,88 @@ export async function importNotionExport(file: File): Promise<ImportResult> {
 }
 
 /**
+ * Import a backup.json produced by exportNotesAsJSON / exportFullBackup.
+ * This is the restore path the backup archive's README documents, so it has to
+ * round-trip every field - ids, timestamps, backlinks and metadata included.
+ */
+export async function importBackupFile(file: File): Promise<ImportResult> {
+  const errors: string[] = [];
+  let notes: Note[] = [];
+
+  try {
+    const parsed = JSON.parse(await file.text());
+    const candidates = Array.isArray(parsed) ? parsed : parsed?.notes;
+
+    if (!Array.isArray(candidates)) {
+      errors.push("Not a BrainVault backup: no `notes` array found");
+    } else {
+      notes = candidates
+        .filter((note: any) => note && typeof note.title === "string")
+        .map((note: any) => ({
+          id: note.id || `backup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          title: note.title,
+          content: note.content || "",
+          tags: note.tags || [],
+          links: note.links || extractWikiLinks(note.content || ""),
+          backlinks: note.backlinks || [],
+          attachments: note.attachments || [],
+          path: note.path || `${note.title}.md`,
+          plainContent: note.plainContent || (note.content || "").replace(/[#\[\]]/g, ""),
+          metadata: note.metadata || {},
+          createdAt: note.createdAt || new Date().toISOString(),
+          updatedAt: note.updatedAt || note.createdAt || new Date().toISOString(),
+        }));
+
+      const rejected = candidates.length - notes.length;
+      if (rejected > 0) {
+        errors.push(`${rejected} entries skipped: missing a title`);
+      }
+    }
+  } catch (error) {
+    errors.push(`Failed to read backup: ${error}`);
+  }
+
+  return {
+    success: errors.length === 0,
+    notes,
+    errors,
+    stats: {
+      total: notes.length + errors.length,
+      imported: notes.length,
+      skipped: 0,
+      failed: errors.length,
+    },
+  };
+}
+
+/**
+ * Import a backup.json (file picker)
+ */
+export async function importFromBackup(): Promise<ImportResult> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        resolve(await importBackupFile(file));
+      } else {
+        resolve({
+          success: false,
+          notes: [],
+          errors: ["No file selected"],
+          stats: { total: 0, imported: 0, skipped: 0, failed: 0 },
+        });
+      }
+    };
+
+    input.click();
+  });
+}
+
+/**
  * Import from Notion export (file picker)
  */
 export async function importFromNotion(): Promise<ImportResult> {

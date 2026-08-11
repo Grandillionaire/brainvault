@@ -4,9 +4,9 @@
  */
 
 import React, { useState } from "react";
-import { X, Upload, FolderOpen, FileText, AlertCircle, Check, Loader2 } from "lucide-react";
+import { X, Upload, FolderOpen, FileText, Archive, AlertCircle, Check, Loader2 } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
-import { importMarkdownFiles, importFromDirectory, importObsidianVault, importFromNotion, ImportResult } from "../../lib/import";
+import { importMarkdownFiles, importFromDirectory, importObsidianVault, importFromNotion, importFromBackup, ImportResult } from "../../lib/import";
 import { toast } from "sonner";
 import { cn } from "../../lib/utils";
 
@@ -15,10 +15,10 @@ interface ImportModalProps {
   onClose: () => void;
 }
 
-type ImportMode = "files" | "folder" | "obsidian" | "notion";
+type ImportMode = "files" | "folder" | "obsidian" | "notion" | "backup";
 
 export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => {
-  const { createNote } = useNotesStore();
+  const { importNotes } = useNotesStore();
   const [mode, setMode] = useState<ImportMode>("files");
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -35,11 +35,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => 
       setResult(importResult);
 
       if (importResult.notes.length > 0) {
-        // Add notes to store
-        for (const note of importResult.notes) {
-          await createNote(note.title, note.content);
-        }
-        toast.success(`Imported ${importResult.notes.length} notes`);
+        // Add notes to the store as-is: createNote(title, content) would throw
+        // away timestamps, folder paths, frontmatter tags and backlinks.
+        const added = await importNotes(importResult.notes);
+        toast.success(`Imported ${added} notes`);
       }
     } catch (error) {
       toast.error(`Import failed: ${error}`);
@@ -99,6 +98,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => 
       description: "Import from Notion",
       icon: FileText,
     },
+    {
+      id: "backup" as ImportMode,
+      name: "Backup",
+      description: "Restore backup.json",
+      icon: Archive,
+    },
   ];
 
   return (
@@ -122,7 +127,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => 
 
         {/* Import Mode Selection */}
         <div className="p-6 border-b">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {importModes.map((importMode) => (
               <button
                 key={importMode.id}
@@ -289,6 +294,23 @@ export const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose }) => 
                   <p className="text-xs text-muted-foreground mt-4">
                     In Notion: Settings → Export → Markdown & CSV
                   </p>
+                </div>
+              )}
+
+              {mode === "backup" && (
+                <div className="text-center py-12">
+                  <Archive className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium mb-2">Restore a BrainVault backup</p>
+                  <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+                    Select the <code>backup.json</code> from a full backup archive.
+                    Ids, timestamps, tags, links and metadata are restored as-is.
+                  </p>
+                  <button
+                    onClick={() => handleImport(importFromBackup)}
+                    className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                  >
+                    Select backup.json
+                  </button>
                 </div>
               )}
             </>

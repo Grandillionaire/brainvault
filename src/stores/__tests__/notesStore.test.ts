@@ -3,7 +3,7 @@ import { useNotesStore } from "../notesStore";
 import { Note } from "../../types";
 
 // Mock the API
-vi.mock("../../lib/api", () => ({
+const mockApi = vi.hoisted(() => ({
   notesApi: {
     getAll: vi.fn().mockResolvedValue([]),
     create: vi.fn().mockImplementation((data) => ({
@@ -33,6 +33,14 @@ vi.mock("../../lib/api", () => ({
   },
   searchApi: {
     search: vi.fn().mockResolvedValue({ results: [] }),
+  },
+}));
+
+vi.mock("../../lib/api", () => ({
+  ...mockApi,
+  default: {
+    notes: mockApi.notesApi,
+    search: mockApi.searchApi,
   },
 }));
 
@@ -123,6 +131,108 @@ describe("notesStore", () => {
 
       expect(note.tags).toContain("tag1");
       expect(note.tags).toContain("tag2");
+    });
+  });
+
+  describe("loadNotes", () => {
+    it("should keep the persisted vault when the API is unreachable", async () => {
+      const persisted: Note = {
+        id: "vault-1",
+        title: "MY TAX RECORDS 2026",
+        content: "important",
+        tags: [],
+        links: [],
+        backlinks: [],
+        attachments: [],
+        metadata: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      useNotesStore.setState({ notes: [persisted] });
+      mockApi.notesApi.getAll.mockRejectedValueOnce(new Error("Network error"));
+
+      await useNotesStore.getState().loadNotes();
+
+      const { notes, isLoading } = useNotesStore.getState();
+      expect(notes).toEqual([persisted]);
+      expect(isLoading).toBe(false);
+    });
+
+    it("should replace notes with the server copy when the API answers", async () => {
+      const serverNote = { id: "server-1", title: "From server" } as Note;
+      mockApi.notesApi.getAll.mockResolvedValueOnce([serverNote]);
+
+      await useNotesStore.getState().loadNotes();
+
+      expect(useNotesStore.getState().notes).toEqual([serverNote]);
+    });
+  });
+
+  describe("updateNote", () => {
+    it("should persist the edit locally when the API rejects", async () => {
+      mockApi.notesApi.create.mockRejectedValueOnce(new Error("Network error"));
+      mockApi.notesApi.update.mockRejectedValueOnce(new Error("Network error"));
+
+      const note = await useNotesStore.getState().createNote("Journal", "original body");
+      await useNotesStore.getState().updateNote(note.id, { content: "TWO HOURS OF WRITING" });
+
+      const saved = useNotesStore.getState().getNote(note.id);
+      expect(saved?.content).toBe("TWO HOURS OF WRITING");
+      expect(useNotesStore.getState().currentNote?.content).toBe("TWO HOURS OF WRITING");
+    });
+
+    it("should re-derive tags and links from updated content", async () => {
+      mockApi.notesApi.create.mockRejectedValueOnce(new Error("Network error"));
+      mockApi.notesApi.update.mockRejectedValueOnce(new Error("Network error"));
+
+      const note = await useNotesStore.getState().createNote("Journal", "");
+      await useNotesStore
+        .getState()
+        .updateNote(note.id, { content: "see [[Other Note]] about #work" });
+
+      const saved = useNotesStore.getState().getNote(note.id);
+      expect(saved?.tags).toEqual(["work"]);
+      expect(saved?.links).toEqual(["Other Note"]);
+    });
+  });
+
+  describe("importNotes", () => {
+    it("should preserve timestamps, path and metadata of imported notes", async () => {
+      const imported: Note = {
+        id: "import-1",
+        title: "Old Note",
+        content: "body",
+        tags: ["work", "ideas"],
+        links: [],
+        backlinks: ["import-2"],
+        attachments: [],
+        path: "projects/2019/Old Note.md",
+        plainContent: "body",
+        metadata: { created: "2019-03-04T00:00:00.000Z" },
+        createdAt: "2019-03-04T00:00:00.000Z",
+        updatedAt: "2020-01-01T00:00:00.000Z",
+      };
+
+      const added = await useNotesStore.getState().importNotes([imported]);
+
+      expect(added).toBe(1);
+      const stored = useNotesStore.getState().getNote("import-1");
+      expect(stored?.createdAt).toBe("2019-03-04T00:00:00.000Z");
+      expect(stored?.updatedAt).toBe("2020-01-01T00:00:00.000Z");
+      expect(stored?.path).toBe("projects/2019/Old Note.md");
+      expect(stored?.tags).toEqual(["work", "ideas"]);
+      expect(stored?.backlinks).toEqual(["import-2"]);
+      expect(stored?.metadata).toEqual({ created: "2019-03-04T00:00:00.000Z" });
+    });
+
+    it("should skip notes whose id is already in the vault", async () => {
+      const note = { id: "dup", title: "Dup", content: "" } as Note;
+      useNotesStore.setState({ notes: [note] });
+
+      const added = await useNotesStore.getState().importNotes([note]);
+
+      expect(added).toBe(0);
+      expect(useNotesStore.getState().notes.length).toBe(1);
     });
   });
 

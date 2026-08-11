@@ -1,7 +1,5 @@
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import {
   createAttachment,
   getAttachmentsByNoteId,
@@ -14,6 +12,16 @@ import {
 
 const router = express.Router();
 
+// `:noteId` ends up in a filesystem path, so it must be an id and nothing else
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function requireNoteId(req, res, next) {
+  if (!UUID_PATTERN.test(req.params.noteId)) {
+    return res.status(400).json({ error: 'Invalid note id' });
+  }
+  next();
+}
+
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -24,7 +32,7 @@ const upload = multer({
 });
 
 // Upload attachment
-router.post('/:noteId', upload.single('file'), async (req, res) => {
+router.post('/:noteId', requireNoteId, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file provided' });
@@ -44,7 +52,7 @@ router.post('/:noteId', upload.single('file'), async (req, res) => {
 });
 
 // Get attachments for a note
-router.get('/:noteId', async (req, res) => {
+router.get('/:noteId', requireNoteId, async (req, res) => {
   try {
     const attachments = getAttachmentsByNoteId(req.params.noteId);
     res.json(attachments);

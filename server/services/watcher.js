@@ -1,7 +1,7 @@
 import chokidar from 'chokidar';
 import path from 'path';
-import { getVaultPath, loadNoteFromFile } from './vault.js';
-import { createNote, updateNote, deleteNote, getNoteById } from './database.js';
+import { getVaultPath, loadNoteFromFile, consumeSelfWrite } from './vault.js';
+import { createNote, updateNote, deleteNote, getNoteById, getAllNotes } from './database.js';
 
 let watcher;
 
@@ -32,6 +32,10 @@ export function startFileWatcher() {
 
 async function handleFileAdd(filepath) {
   try {
+    // Ignore the events our own writes produce, otherwise the delayed re-read
+    // of an older edit can land after a newer one and revert it.
+    if (consumeSelfWrite(filepath)) return;
+
     console.log('File added:', filepath);
     const note = loadNoteFromFile(filepath);
 
@@ -51,6 +55,8 @@ async function handleFileAdd(filepath) {
 
 async function handleFileChange(filepath) {
   try {
+    if (consumeSelfWrite(filepath)) return;
+
     console.log('File changed:', filepath);
     const note = loadNoteFromFile(filepath);
 
@@ -72,12 +78,19 @@ async function handleFileChange(filepath) {
 
 async function handleFileRemove(filepath) {
   try {
+    if (consumeSelfWrite(filepath)) return;
+
     console.log('File removed:', filepath);
 
-    // Find note by path
-    const filename = path.basename(filepath);
-    // This is a simplified approach - in production, you'd want to track filepath in DB
-    broadcastUpdate('note:deleted', { path: filepath });
+    // Notes store their absolute path, so the row can actually be found and
+    // removed - broadcasting a bare path left a phantom row in the database.
+    const resolved = path.resolve(filepath);
+    const note = getAllNotes().find(n => n.path && path.resolve(n.path) === resolved);
+
+    if (!note) return;
+
+    deleteNote(note.id);
+    broadcastUpdate('note:deleted', { id: note.id, path: filepath });
   } catch (error) {
     console.error('Error handling file remove:', error);
   }

@@ -10,7 +10,9 @@ import { createLowlight, all } from "lowlight";
 
 const lowlight = createLowlight(all);
 import { useNotesStore } from "../../stores/notesStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useUIStore } from "../../stores/uiStore";
+import { markdownToHtml, editorDocToMarkdown } from "../../lib/markdown";
 import { debounce } from "../../lib/utils";
 import { cn } from "../../lib/utils";
 import { EditorContextMenu } from "./EditorContextMenu";
@@ -33,6 +35,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   readOnly = false,
 }) => {
   const { updateNote, currentNote, notes, setCurrentNote } = useNotesStore();
+  const { settings } = useSettingsStore();
   const { focusMode, setSearchQuery, openCommandPalette } = useUIStore();
   const [wordCount, setWordCount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -70,7 +73,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         nested: true,
       }),
     ],
-    content: content || "",
+    content: markdownToHtml(content),
     editable: !readOnly,
     autofocus: true,
     editorProps: {
@@ -80,46 +83,49 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       },
     },
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
+      const markdown = editorDocToMarkdown(editor.getJSON());
       const text = editor.getText();
       const words = text.split(/\s+/).filter(Boolean).length;
       setWordCount(words);
-      debouncedSave(html);
+      debouncedSave(markdown);
     },
     onCreate: ({ editor }) => {
-      console.log('Editor created, editable:', editor.isEditable);
       const text = editor.getText();
       const words = text.split(/\s+/).filter(Boolean).length;
       setWordCount(words);
     },
   }, [readOnly]);
 
+  const autoSave = settings.general.autoSave;
+
   const debouncedSave = useCallback(
     debounce(async (content: string) => {
-      if (onChange) {
-        // If onChange is provided, use it (parent handles saving)
-        onChange(content);
+      // Keep the parent in sync (preview pane, cmd+s) ...
+      onChange?.(content);
+
+      // ... and persist. The parent only holds React state, so skipping this
+      // would silently drop every keystroke.
+      const targetId = noteId || currentNote?.id;
+      if (!autoSave || !targetId || readOnly) {
         return;
       }
-      if (noteId || currentNote?.id) {
-        // Otherwise, handle saving here
-        setIsSaving(true);
-        try {
-          await updateNote(noteId || currentNote!.id, { content });
-        } catch (error) {
-          console.error("Failed to save note:", error);
-        } finally {
-          setIsSaving(false);
-        }
+
+      setIsSaving(true);
+      try {
+        await updateNote(targetId, { content });
+      } catch (error) {
+        console.error("Failed to save note:", error);
+      } finally {
+        setIsSaving(false);
       }
     }, 500),
-    [noteId, currentNote, updateNote, onChange]
+    [noteId, currentNote, updateNote, onChange, autoSave, readOnly]
   );
 
   useEffect(() => {
-    if (editor && !editor.isFocused && content !== editor.getHTML()) {
+    if (editor && !editor.isFocused && content !== editorDocToMarkdown(editor.getJSON())) {
       // Only update content if editor is not focused (prevent disrupting typing)
-      editor.commands.setContent(content, { emitUpdate: false });
+      editor.commands.setContent(markdownToHtml(content), { emitUpdate: false });
     }
   }, [content, editor]);
 

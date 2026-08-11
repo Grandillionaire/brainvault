@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 import notesRouter from './routes/notes.js';
 import searchRouter from './routes/search.js';
 import settingsRouter from './routes/settings.js';
-import authRouter from './routes/auth.js';
+import authRouter, { authenticateToken } from './routes/auth.js';
 import aiRouter from './routes/ai.js';
 import attachmentsRouter from './routes/attachments.js';
 
@@ -29,6 +29,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '127.0.0.1';
 
 // Security middleware
 app.use(helmet({
@@ -61,14 +62,14 @@ app.use(morgan('dev'));
 const rateLimits = new Map();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
 const RATE_LIMIT_MAX = 100; // requests per window
+const RATE_LIMIT_SWEEP = 5 * 60000; // evict idle clients every 5 minutes
 
 function rateLimit(req, res, next) {
   const ip = req.ip || req.connection.remoteAddress;
   const now = Date.now();
   const windowStart = now - RATE_LIMIT_WINDOW;
 
-  if (!rateLimits.has(ip)) rateLimits.set(ip, []);
-  const requests = rateLimits.get(ip).filter(t => t > windowStart);
+  const requests = (rateLimits.get(ip) || []).filter(t => t > windowStart);
   requests.push(now);
   rateLimits.set(ip, requests);
 
@@ -78,6 +79,20 @@ function rateLimit(req, res, next) {
   next();
 }
 
+// Without eviction the map grows one array per source address forever
+const rateLimitSweeper = setInterval(() => {
+  const windowStart = Date.now() - RATE_LIMIT_WINDOW;
+  for (const [ip, requests] of rateLimits) {
+    const recent = requests.filter(t => t > windowStart);
+    if (recent.length === 0) {
+      rateLimits.delete(ip);
+    } else {
+      rateLimits.set(ip, recent);
+    }
+  }
+}, RATE_LIMIT_SWEEP);
+rateLimitSweeper.unref();
+
 // Apply before routes
 app.use(rateLimit);
 
@@ -85,12 +100,20 @@ app.use(rateLimit);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
-app.use('/api/notes', notesRouter);
-app.use('/api/search', searchRouter);
-app.use('/api/settings', settingsRouter);
+//
+// Everything except /api/auth touches the vault. When AUTH_REQUIRED is on
+// (the right setting for any non-loopback deployment) those routes go behind
+// the JWT middleware; previously authenticateToken guarded only /api/auth/me,
+// so the notes, search, settings, AI and attachment endpoints were open.
+const AUTH_REQUIRED = process.env.AUTH_REQUIRED === 'true';
+const guard = AUTH_REQUIRED ? [authenticateToken] : [];
+
+app.use('/api/notes', ...guard, notesRouter);
+app.use('/api/search', ...guard, searchRouter);
+app.use('/api/settings', ...guard, settingsRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/ai', aiRouter);
-app.use('/api/attachments', attachmentsRouter);
+app.use('/api/ai', ...guard, aiRouter);
+app.use('/api/attachments', ...guard, attachmentsRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -127,10 +150,15 @@ async function startServer() {
     startFileWatcher();
     console.log('✅ File watcher started');
 
-    // Start HTTP server
-    const server = app.listen(PORT, () => {
-      console.log(`🚀 BrainVault server running on http://localhost:${PORT}`);
+    // Start HTTP server.
+    // Bind to loopback by default: the vault is unauthenticated in the
+    // single-user setup, so it must not be reachable from the network.
+    const server = app.listen(PORT, HOST, () => {
+      console.log(`🚀 BrainVault server running on http://${HOST}:${PORT}`);
       console.log(`📁 Vault location: ${process.env.VAULT_PATH || path.join(__dirname, 'vault')}`);
+      if (!AUTH_REQUIRED) {
+        console.log('🔓 AUTH_REQUIRED is off - API is open to anything that can reach this port');
+      }
     });
 
     // WebSocket server for real-time updates

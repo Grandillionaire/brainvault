@@ -8,10 +8,6 @@
 
 > A local-first, privacy-focused note-taking app with AI-powered features. Your second brain, running entirely on your machine.
 
-<p align="center">
-  <img src="docs/demo.gif" alt="BrainVault Demo" width="800"/>
-</p>
-
 ## ✨ Features
 
 ### 📝 **Powerful Editor**
@@ -63,7 +59,7 @@
 
 | Feature | BrainVault | Obsidian | Notion |
 |---------|------------|----------|--------|
-| **Local-first** | ✅ 100% local | ✅ Local files | ❌ Cloud-only |
+| **Local-first** | ✅ Local (except voice notes*) | ✅ Local files | ❌ Cloud-only |
 | **Free** | ✅ MIT License | ⚠️ Freemium | ⚠️ Freemium |
 | **Open source** | ✅ | ❌ | ❌ |
 | **Wiki links** | ✅ | ✅ | ⚠️ Limited |
@@ -75,26 +71,10 @@
 | **File format** | Markdown | Markdown | Proprietary |
 | **Import from Obsidian** | ✅ | N/A | ⚠️ Manual |
 
----
-
-## 🖥️ Screenshots
-
-<details>
-<summary>Click to expand screenshots</summary>
-
-### Editor View
-![Editor](docs/screenshots/editor.png)
-
-### Graph View  
-![Graph](docs/screenshots/graph.png)
-
-### AI Assistant
-![AI](docs/screenshots/ai.png)
-
-### Command Palette
-![Commands](docs/screenshots/commands.png)
-
-</details>
+\* Voice notes use the browser's Web Speech API, which in Chrome and Edge
+transcribes in the cloud rather than on-device. The app asks for consent before
+the microphone is opened and the feature stays off until you accept. See
+[SECURITY.md](SECURITY.md).
 
 ---
 

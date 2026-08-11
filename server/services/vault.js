@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import matter from 'gray-matter';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -145,10 +145,75 @@ export function getVaultPath() {
   return vaultPath;
 }
 
+// Paths the server itself just wrote, so the file watcher can ignore the
+// change events its own writes generate (see services/watcher.js).
+const selfWrites = new Map();
+const SELF_WRITE_TTL = 10000;
+
+export function markSelfWrite(filepath) {
+  selfWrites.set(path.resolve(filepath), Date.now());
+}
+
+export function consumeSelfWrite(filepath) {
+  const key = path.resolve(filepath);
+  const now = Date.now();
+
+  for (const [candidate, at] of selfWrites) {
+    if (now - at > SELF_WRITE_TTL) selfWrites.delete(candidate);
+  }
+
+  if (!selfWrites.has(key)) return false;
+  selfWrites.delete(key);
+  return true;
+}
+
+export function isInsideDir(parent, candidate) {
+  const resolvedParent = path.resolve(parent);
+  const resolvedCandidate = path.resolve(candidate);
+  return (
+    resolvedCandidate === resolvedParent ||
+    resolvedCandidate.startsWith(resolvedParent + path.sep)
+  );
+}
+
+/**
+ * Pick the file a note is stored in.
+ *
+ * The slug alone is not unique - two notes called "Meeting Notes" resolve to
+ * the same filename and the second write destroys the first. Reuse the note's
+ * own file when it already owns one, otherwise take the first free slug.
+ */
+function resolveNoteFilePath(note) {
+  const notesDir = path.join(vaultPath, 'notes');
+  const dailyDir = path.join(vaultPath, 'daily');
+
+  // Daily notes are keyed by date and keep their existing file
+  if (note.path && isInsideDir(dailyDir, note.path)) {
+    return note.path;
+  }
+
+  const base = slugify(note.title) || 'untitled';
+
+  for (let counter = 1; ; counter++) {
+    const filename = counter === 1 ? `${base}.md` : `${base}-${counter}.md`;
+    const candidate = path.join(notesDir, filename);
+
+    if (!fs.existsSync(candidate)) {
+      return candidate;
+    }
+
+    // The file is ours if it carries this note's id
+    const existing = matter(fs.readFileSync(candidate, 'utf-8'));
+    if (!note.id || existing.data.id === note.id) {
+      return candidate;
+    }
+  }
+}
+
 // File operations
 export function saveNoteToFile(note) {
-  const filename = slugify(note.title) + '.md';
-  const filepath = path.join(vaultPath, 'notes', filename);
+  const filepath = resolveNoteFilePath(note);
+  const notesDir = path.join(vaultPath, 'notes');
 
   const frontmatter = {
     id: note.id,
@@ -167,7 +232,20 @@ export function saveNoteToFile(note) {
   });
 
   const content = matter.stringify(note.content || '', frontmatter);
+  markSelfWrite(filepath);
   fs.writeFileSync(filepath, content);
+
+  // Renaming a note moves it to a new slug; drop the file it used to live in
+  // instead of leaving an orphan the watcher would re-import as a duplicate.
+  if (
+    note.path &&
+    path.resolve(note.path) !== path.resolve(filepath) &&
+    isInsideDir(notesDir, note.path) &&
+    fs.existsSync(note.path)
+  ) {
+    markSelfWrite(note.path);
+    fs.unlinkSync(note.path);
+  }
 
   return filepath;
 }
@@ -205,6 +283,7 @@ export function deleteNoteFile(note) {
 
   try {
     // Move to trash instead of permanent delete
+    markSelfWrite(note.path);
     fs.renameSync(note.path, trashPath);
     return true;
   } catch (error) {
@@ -266,6 +345,7 @@ export function createDailyNote(date = new Date()) {
     .replace(/{{title}}/g, title)
     .replace(/{{date}}/g, dateStr);
 
+  markSelfWrite(filepath);
   fs.writeFileSync(filepath, template);
   return loadNoteFromFile(filepath);
 }
@@ -297,7 +377,15 @@ tags: ["daily"]
 
 // Attachment handling
 export function saveAttachment(file, noteId) {
-  const attachmentsDir = path.join(vaultPath, 'attachments', noteId);
+  const attachmentsRoot = path.join(vaultPath, 'attachments');
+  const attachmentsDir = path.join(attachmentsRoot, noteId);
+
+  // Compare against the vault's attachments root, not the derived directory:
+  // `noteId` is caller-controlled, so a traversal poisons `attachmentsDir`
+  // itself and any check made against it passes trivially.
+  if (!isInsideDir(attachmentsRoot, attachmentsDir)) {
+    throw new Error('Invalid note id');
+  }
 
   if (!fs.existsSync(attachmentsDir)) {
     fs.mkdirSync(attachmentsDir, { recursive: true });
@@ -306,8 +394,7 @@ export function saveAttachment(file, noteId) {
   const safeName = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_');
   const filename = `${Date.now()}_${safeName}`;
   const filepath = path.join(attachmentsDir, filename);
-  // Verify the resolved path is still within attachmentsDir
-  if (!filepath.startsWith(attachmentsDir)) {
+  if (!isInsideDir(attachmentsDir, filepath)) {
     throw new Error('Invalid file path');
   }
 
@@ -368,16 +455,20 @@ export function saveTemplate(name, content) {
 }
 
 // Utility functions
-function slugify(text) {
-  return text
+export function slugify(text) {
+  // \p{L}\p{N} keeps non-latin scripts. `\w` is [A-Za-z0-9_] only, so every
+  // Japanese, Cyrillic, Greek, Arabic or Hebrew title slugified to "" and all
+  // of those notes overwrote each other in a single ".md" dotfile.
+  return String(text || '')
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
     .trim();
 }
 
-function stripMarkdown(content) {
+export function stripMarkdown(content) {
   return content
     .replace(/#{1,6}\s/g, '') // Remove headers
     .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold
@@ -392,7 +483,7 @@ function stripMarkdown(content) {
     .trim();
 }
 
-function extractWikiLinks(content) {
+export function extractWikiLinks(content) {
   const regex = /\[\[([^\]]+)\]\]/g;
   const links = [];
   let match;
@@ -420,6 +511,10 @@ export function extractTags(content) {
 export default {
   initVault,
   getVaultPath,
+  slugify,
+  isInsideDir,
+  markSelfWrite,
+  consumeSelfWrite,
   saveNoteToFile,
   loadNoteFromFile,
   deleteNoteFile,
@@ -430,5 +525,6 @@ export default {
   getTemplates,
   saveTemplate,
   extractTags,
-  extractWikiLinks: extractWikiLinks
+  extractWikiLinks,
+  stripMarkdown
 };

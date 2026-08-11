@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { Settings } from "../types";
-import api from "../lib/api";
+import { getApi } from "../lib/tauri-api";
+
+// Tauri commands in the desktop app, HTTP in the browser
+const api = getApi();
 
 interface SettingsState {
   settings: Settings;
